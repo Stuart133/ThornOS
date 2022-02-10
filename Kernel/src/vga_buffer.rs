@@ -56,7 +56,7 @@ impl Writer {
     for byte in s.bytes() {
       match byte {
         // Printable ASCII characters & newline
-        0x20..0x7e | b'\n' => self.write_byte(byte),
+        0x20..=0x7e | b'\n' => self.write_byte(byte),
         // Print ■ for everything else
         _ => self.write_byte(0xfe),
       }
@@ -84,5 +84,17 @@ impl Writer {
     }
   }
 
-  fn new_line() {/* TODO */}
+  fn new_line(&self) {/* TODO */}
+}
+
+pub fn print_something() {
+  let mut writer = Writer {
+    column_position: 0,
+    color_code: ColorCode::new(Color::Yellow, Color::Black),
+    buffer: unsafe { &mut *(0xb8000 as *mut Buffer)},
+  };
+
+  writer.write_byte(b'H');
+  writer.write_string("ello ");
+  writer.write_string("world!");
 }
