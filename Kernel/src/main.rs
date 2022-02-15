@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 #![feature(custom_test_frameworks)]
+#![feature(unboxed_closures)]
 #![test_runner(crate::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
@@ -25,6 +26,19 @@ pub fn exit_qemu(exit_code: QemuExitCode) {
     }
 }
 
+pub trait Testable {
+    fn run(&self) -> ();
+}
+
+impl<T> Testable for T
+    where T: Fn(), {
+        fn run(&self) {
+            serial_print!("{}...\t", core::any::type_name::<T>());
+            self();
+            serial_println!("[ok]");
+        }
+    }
+
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
     println!("Hello world{}", "!");
@@ -33,13 +47,6 @@ pub extern "C" fn _start() -> ! {
     test_main();
 
     loop {}
-}
-
-#[test_case]
-fn trivial_assertion() {
-    serial_print!("trivial assertation.... ");
-    assert_eq!(1, 1);
-    serial_println!("[ok]");
 }
 
 #[cfg(not(test))]
@@ -59,11 +66,16 @@ fn panic(_info: &PanicInfo) -> ! {
 }
 
 #[cfg(test)]
-fn test_runner(tests: &[&dyn Fn()]) {
+fn test_runner(tests: &[&dyn Testable]) {
     serial_println!("Running {} tests", tests.len());
     for test in tests {
-        test();
+        test.run();
     }
 
     exit_qemu(QemuExitCode::Success);
+}
+
+#[test_case]
+fn trivial_assertion() {
+    assert_eq!(1, 1);
 }
