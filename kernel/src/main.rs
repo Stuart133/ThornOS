@@ -1,43 +1,14 @@
 #![no_std]
 #![no_main]
 #![feature(custom_test_frameworks)]
-#![feature(unboxed_closures)]
-#![test_runner(crate::test_runner)]
+#![test_runner(crate::tests::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
+#[cfg(not(test))]
 use core::panic::PanicInfo;
 
 mod serial;
 mod vga_buffer;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u32)]
-pub enum QemuExitCode {
-    Success = 0x10,
-    Failed = 0x11,
-}
-
-pub fn exit_qemu(exit_code: QemuExitCode) {
-    use x86_64::instructions::port::Port;
-
-    unsafe {
-        let mut port = Port::new(0xf4);
-        port.write(exit_code as u32);
-    }
-}
-
-pub trait Testable {
-    fn run(&self) -> ();
-}
-
-impl<T> Testable for T
-    where T: Fn(), {
-        fn run(&self) {
-            serial_print!("{}...\t", core::any::type_name::<T>());
-            self();
-            serial_println!("[ok]");
-        }
-    }
 
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
@@ -57,25 +28,58 @@ fn panic(_info: &PanicInfo) -> ! {
 }
 
 #[cfg(test)]
-#[panic_handler]
-fn panic(_info: &PanicInfo) -> ! {
-    serial_println!("[failed]\n");
-    serial_println!("Error: {}\n", _info);
-    exit_qemu(QemuExitCode::Failed);
-    loop {}
-}
+mod tests {
+    use core::panic::PanicInfo;
+    use crate::{serial_println, serial_print};
 
-#[cfg(test)]
-fn test_runner(tests: &[&dyn Testable]) {
-    serial_println!("Running {} tests", tests.len());
-    for test in tests {
-        test.run();
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    #[repr(u32)]
+    pub enum QemuExitCode {
+        Success = 0x10,
+        Failed = 0x11,
+    }
+    
+    pub fn exit_qemu(exit_code: QemuExitCode) {
+        use x86_64::instructions::port::Port;
+    
+        unsafe {
+            let mut port = Port::new(0xf4);
+            port.write(exit_code as u32);
+        }
+    } 
+
+    pub trait Testable {
+        fn run(&self) -> ();
+    }
+    
+    impl<T> Testable for T
+        where T: Fn(), {
+            fn run(&self) {
+                serial_print!("{}...\t", core::any::type_name::<T>());
+                self();
+                serial_println!("[ok]");
+            }
+        }   
+    
+    #[panic_handler]
+    fn panic(_info: &PanicInfo) -> ! {
+        serial_println!("[failed]\n");
+        serial_println!("Error: {}\n", _info);
+        exit_qemu(QemuExitCode::Failed);
+        loop {}
     }
 
-    exit_qemu(QemuExitCode::Success);
-}
+    pub fn test_runner(tests: &[&dyn Testable]) {
+        serial_println!("Running {} tests", tests.len());
+        for test in tests {
+            test.run();
+        }
 
-#[test_case]
-fn trivial_assertion() {
-    assert_eq!(1, 1);
+        exit_qemu(QemuExitCode::Success);
+    }
+
+    #[test_case]
+    fn trivial_assertion() {
+        assert_eq!(1, 1);
+    }
 }
