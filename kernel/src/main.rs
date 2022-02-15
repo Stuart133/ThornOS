@@ -7,6 +7,8 @@
 #[cfg(not(test))]
 use core::panic::PanicInfo;
 
+use crate::vga_buffer::WRITER;
+
 mod serial;
 mod vga_buffer;
 
