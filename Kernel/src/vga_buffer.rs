@@ -126,11 +126,13 @@ impl fmt::Write for Writer {
     }
 }
 
+/// Prints to the screen via the VGA buffer
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
 }
 
+/// Prints to the screen via the VGA buffer, appending a new line
 #[macro_export]
 macro_rules! println {
     () => ($crate::print!("\n"));

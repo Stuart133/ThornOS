@@ -20,3 +20,4 @@ Some general TODOs for now
 
 - Pre commit hook
 - CI hookup
+- Reduce deps
