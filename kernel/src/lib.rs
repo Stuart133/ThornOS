@@ -7,8 +7,8 @@
 use core::panic::PanicInfo;
 use core::ops::Fn;
 
-mod serial;
-mod vga_buffer;
+pub mod serial;
+pub mod vga_buffer;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
