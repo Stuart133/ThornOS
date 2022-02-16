@@ -147,7 +147,7 @@ pub fn _print(args: fmt::Arguments) {
 
 #[cfg(test)]
 mod tests {
-    use crate::{vga_buffer::*, serial_println};
+    use crate::vga_buffer::*;
 
     #[test_case]
     fn test_println_simple() {
