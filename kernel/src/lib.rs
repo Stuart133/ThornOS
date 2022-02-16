@@ -5,7 +5,6 @@
 #![reexport_test_harness_main = "test_main"]
 
 use core::panic::PanicInfo;
-use core::ops::Fn;
 
 pub mod serial;
 pub mod vga_buffer;
