@@ -147,7 +147,7 @@ pub fn _print(args: fmt::Arguments) {
 
 #[cfg(test)]
 mod tests {
-    use crate::vga_buffer::*;
+    use crate::{vga_buffer::*, serial_println};
 
     #[test_case]
     fn test_println_simple() {
@@ -168,6 +168,31 @@ mod tests {
         for (i, c) in s.chars().enumerate() {
             let screen_char = WRITER.lock().buffer.chars[BUFFER_HEIGHT - 2][i].read();
             assert_eq!(char::from(screen_char.ascii_character), c);
+        }
+    }
+
+    #[test_case]
+    fn test_println_multiline_output() {
+        let s = "This is a really long string and it is too long to fit on one line. So it should wrap around to the next";
+
+        let top = s.chars().count() / BUFFER_WIDTH;
+
+        println!("{}", s);
+        for (i, c) in s.chars().enumerate() {
+            let line = BUFFER_HEIGHT - 2 - (top - (i / BUFFER_WIDTH));
+            let screen_char = WRITER.lock().buffer.chars[line][i % BUFFER_WIDTH].read();
+            assert_eq!(char::from(screen_char.ascii_character), c);
+        }
+    }
+
+    #[test_case]
+    fn test_println_unicode() {
+        let s = "Ψ😇🥰";
+
+        println!("{}", s);
+        for i in 0..s.len() {
+            let screen_char = WRITER.lock().buffer.chars[BUFFER_HEIGHT - 2][i].read();
+            assert_eq!(char::from(screen_char.ascii_character), char::from(0xfe));
         }
     }
 }

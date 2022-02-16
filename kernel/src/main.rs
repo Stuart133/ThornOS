@@ -7,8 +7,6 @@
 #[cfg(not(test))]
 use core::panic::PanicInfo;
 
-use crate::vga_buffer::WRITER;
-
 mod serial;
 mod vga_buffer;
 
@@ -31,8 +29,8 @@ fn panic(_info: &PanicInfo) -> ! {
 
 #[cfg(test)]
 mod tests {
+    use crate::{serial_print, serial_println};
     use core::panic::PanicInfo;
-    use crate::{serial_println, serial_print};
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     #[repr(u32)]
@@ -40,29 +38,31 @@ mod tests {
         Success = 0x10,
         Failed = 0x11,
     }
-    
+
     pub fn exit_qemu(exit_code: QemuExitCode) {
         use x86_64::instructions::port::Port;
-    
+
         unsafe {
             let mut port = Port::new(0xf4);
             port.write(exit_code as u32);
         }
-    } 
+    }
 
     pub trait Testable {
         fn run(&self) -> ();
     }
-    
+
     impl<T> Testable for T
-        where T: Fn(), {
-            fn run(&self) {
-                serial_print!("{}...\t", core::any::type_name::<T>());
-                self();
-                serial_println!("[ok]");
-            }
-        }   
-    
+    where
+        T: Fn(),
+    {
+        fn run(&self) {
+            serial_print!("{}...\t", core::any::type_name::<T>());
+            self();
+            serial_println!("[ok]");
+        }
+    }
+
     #[panic_handler]
     fn panic(_info: &PanicInfo) -> ! {
         serial_println!("[failed]\n");
@@ -77,11 +77,6 @@ mod tests {
             test.run();
         }
 
-        exit_qemu(QemuExitCode::Success);
-    }
-
-    #[test_case]
-    fn trivial_assertion() {
-        assert_eq!(1, 1);
+       exit_qemu(QemuExitCode::Success);
     }
 }
