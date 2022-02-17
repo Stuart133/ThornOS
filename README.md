@@ -1,5 +1,5 @@
 # ThornOS
-
+  
 A Rust Operating System, written from the ground up
 
 # Build Dependencies
@@ -21,3 +21,4 @@ Some general TODOs for now
 - Pre commit hook
 - CI hookup
 - Reduce deps
+- Improve test framework (panic tests)
