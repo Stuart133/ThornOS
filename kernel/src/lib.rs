@@ -19,6 +19,12 @@ pub fn init() {
     x86_64::instructions::interrupts::enable();
 }
 
+pub fn htl_loop() -> ! {
+    loop {
+        x86_64::instructions::hlt();
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
 pub enum QemuExitCode {
@@ -63,7 +69,7 @@ pub fn test_panic_handler(_info: &PanicInfo) -> ! {
     serial_println!("[failed]\n");
     serial_println!("Error: {}\n", _info);
     exit_qemu(QemuExitCode::Failed);
-    loop {}
+    htl_loop();
 }
 
 /// Entry point for `cargo test`
@@ -72,7 +78,7 @@ pub fn test_panic_handler(_info: &PanicInfo) -> ! {
 pub extern "C" fn _start() -> ! {
     init();
     test_main();
-    loop {}
+    htl_loop();
 }
 
 #[cfg(test)]

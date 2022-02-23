@@ -17,14 +17,14 @@ pub extern "C" fn _start() -> ! {
     test_main();
 
     println!("Still alive!");
-    loop {}
+    kernel::htl_loop();
 }
 
 #[cfg(not(test))]
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
     println!("{}", _info);
-    loop {}
+    kernel::htl_loop();
 }
 
 #[cfg(test)]
