@@ -16,7 +16,6 @@ pub extern "C" fn _start() -> ! {
     #[cfg(test)]
     test_main();
 
-    println!("Still alive!");
     kernel::htl_loop();
 }
 
