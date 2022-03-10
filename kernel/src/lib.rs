@@ -73,10 +73,16 @@ pub fn test_panic_handler(_info: &PanicInfo) -> ! {
     hlt_loop();
 }
 
+#[cfg(test)]
+use bootloader::{entry_point, BootInfo};
+
+#[cfg(test)]
+entry_point!(kernel_main);
+
 /// Entry point for `cargo test`
 #[cfg(test)]
 #[no_mangle]
-pub extern "C" fn _start() -> ! {
+fn kernel_main(_boot_info: &'static BootInfo) -> ! {
     init();
     test_main();
     hlt_loop();
