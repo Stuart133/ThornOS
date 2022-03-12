@@ -5,9 +5,12 @@
 #![reexport_test_harness_main = "test_main"]
 
 use bootloader::{entry_point, BootInfo};
-use x86_64::VirtAddr;
 use core::panic::PanicInfo;
-use kernel::{println, memory::active_level_4_table};
+use kernel::{
+    memory::{active_level_4_table, translate_addr},
+    println,
+};
+use x86_64::{structures::paging::PageTable, VirtAddr};
 
 entry_point!(kernel_main);
 
@@ -20,12 +23,18 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     test_main();
 
     let phys_offset = VirtAddr::new(boot_info.physical_memory_offset);
-    let l4_table = unsafe { active_level_4_table(phys_offset) };
 
-    for (i, entry) in l4_table.iter().enumerate() {
-        if !entry.is_unused() {
-            println!("L4 Entry {}: {:?}", i, entry);
-        }
+    let addresses = [
+        0xb8000, // vga buffer
+        0x201008,
+        0x0100_0020_1a10,
+        boot_info.physical_memory_offset, // Physical address 0
+    ];
+
+    for &addr in &addresses {
+        let virt = VirtAddr::new(addr);
+        let phys = unsafe { translate_addr(virt, phys_offset) };
+        println!("{:?} -> {:?}", virt, phys);
     }
 
     kernel::hlt_loop();
