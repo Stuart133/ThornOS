@@ -6,18 +6,15 @@
 
 use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
-use kernel::{
-    memory::{active_level_4_table, translate_addr},
-    println,
-};
-use x86_64::{structures::paging::PageTable, VirtAddr};
+use kernel::{memory::translate_addr, println};
+use x86_64::VirtAddr;
 
 entry_point!(kernel_main);
 
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     println!("Hello world{}", "!");
 
-    kernel::init();
+    kernel::init(boot_info);
 
     #[cfg(test)]
     test_main();

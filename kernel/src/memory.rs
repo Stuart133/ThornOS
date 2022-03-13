@@ -1,7 +1,18 @@
+use spin::Once;
 use x86_64::registers::control::Cr3;
 use x86_64::structures::paging::page_table::FrameError;
 use x86_64::structures::paging::PageTable;
 use x86_64::{PhysAddr, VirtAddr};
+
+static PHYSICAL_OFFSET: Once<VirtAddr> = Once::new();
+
+/// Initialize the viritual memory system
+///
+/// This function is unsafe as the caller must ensure the physical memory is mapped at the offset specified
+/// or terrible things will happen
+pub unsafe fn init(physical_memory_offset: VirtAddr) {
+    PHYSICAL_OFFSET.call_once(|| physical_memory_offset);
+}
 
 /// Return a mutable reference to the active page table
 pub unsafe fn active_level_4_table(physical_memory_offset: VirtAddr) -> &'static mut PageTable {
