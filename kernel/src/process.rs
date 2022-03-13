@@ -7,12 +7,14 @@ lazy_static! {
     static ref PROCESS_LIST: [Mutex<Process>; NPROC] = init_process_list();
 }
 
+#[allow(dead_code)]
 struct Process {
     state: State,
     exit_code: i32,
     process_id: i32,
 }
 
+#[allow(dead_code)]
 enum State {
     Available,
     Ready,
@@ -21,6 +23,7 @@ enum State {
     Zombie,
 }
 
+#[allow(dead_code)]
 fn init_process() {}
 
 fn init_process_list() -> [Mutex<Process>; NPROC] {

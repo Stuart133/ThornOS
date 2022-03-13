@@ -19,8 +19,6 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     #[cfg(test)]
     test_main();
 
-    let phys_offset = VirtAddr::new(boot_info.physical_memory_offset);
-
     let addresses = [
         0xb8000, // vga buffer
         0x201008,

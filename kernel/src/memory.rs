@@ -72,3 +72,6 @@ fn get_offset() -> VirtAddr {
         None => panic!("virtual memory system to initialized"),
     }
 }
+
+#[cfg(test)]
+mod tests {}
