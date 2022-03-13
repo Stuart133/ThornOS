@@ -9,30 +9,36 @@ static PHYSICAL_OFFSET: Once<VirtAddr> = Once::new();
 /// Initialize the viritual memory system
 ///
 /// This function is unsafe as the caller must ensure the physical memory is mapped at the offset specified
-/// or terrible things will happen
+/// or terrible things will happen. The other calls in this module rely on the fact that once the memory system
+/// is initialized further calls are safe as long as the init call satisfied the requirements above
 pub unsafe fn init(physical_memory_offset: VirtAddr) {
     PHYSICAL_OFFSET.call_once(|| physical_memory_offset);
 }
 
 /// Return a mutable reference to the active page table
-pub unsafe fn active_level_4_table(physical_memory_offset: VirtAddr) -> &'static mut PageTable {
+///
+/// This is unsafe as multiple calls will cause the mutable reference to be aliased
+/// TODO - Investigate safer shared reference implementations
+pub unsafe fn active_level_4_table() -> &'static mut PageTable {
+    let physical_memory_offset = get_offset();
+
     let (level_4_table_frame, _) = Cr3::read();
 
     let phys = level_4_table_frame.start_address();
     let virt = physical_memory_offset + phys.as_u64();
     let page_table_ptr: *mut PageTable = virt.as_mut_ptr();
 
-    &mut *page_table_ptr // TODO: Investigate ways to validate the offset so we can make this function safe to call
+    &mut *page_table_ptr
 }
 
 /// Translate a virtual address into a physical one
-///
-/// The caller must ensure that the entire physical memory is mapped at the offset specified
-pub unsafe fn translate_addr(addr: VirtAddr, physical_memory_offset: VirtAddr) -> Option<PhysAddr> {
-    translate_addr_inner(addr, physical_memory_offset)
+pub fn translate_addr(addr: VirtAddr) -> Option<PhysAddr> {
+    translate_addr_inner(addr)
 }
 
-fn translate_addr_inner(addr: VirtAddr, physical_memory_offset: VirtAddr) -> Option<PhysAddr> {
+fn translate_addr_inner(addr: VirtAddr) -> Option<PhysAddr> {
+    let physical_memory_offset = get_offset();
+
     let (level_4_table_frame, _) = Cr3::read();
 
     let table_indices = [
@@ -58,4 +64,11 @@ fn translate_addr_inner(addr: VirtAddr, physical_memory_offset: VirtAddr) -> Opt
     }
 
     Some(frame.start_address() + u64::from(addr.page_offset()))
+}
+
+fn get_offset() -> VirtAddr {
+    match PHYSICAL_OFFSET.wait() {
+        Some(offset) => *offset,
+        None => panic!("virtual memory system to initialized"),
+    }
 }

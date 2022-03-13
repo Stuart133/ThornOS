@@ -30,7 +30,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
     for &addr in &addresses {
         let virt = VirtAddr::new(addr);
-        let phys = unsafe { translate_addr(virt, phys_offset) };
+        let phys = translate_addr(virt);
         println!("{:?} -> {:?}", virt, phys);
     }
 
