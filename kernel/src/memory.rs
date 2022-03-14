@@ -74,4 +74,48 @@ fn get_offset() -> VirtAddr {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use x86_64::VirtAddr;
+    use crate::vga_buffer::VGA_BUFFER_ADDRESS;
+
+    use super::{translate_addr, get_offset};
+
+    // We know the VGA buffer is identity mapped by the bootloader
+    #[test_case]
+    fn translate_vga_address() {
+        let addr = VirtAddr::new(VGA_BUFFER_ADDRESS);
+        let phys_addr = translate_addr(addr);
+
+        match phys_addr {
+            Some(pa) => assert_eq!(addr.as_u64(), pa.as_u64()),
+            None => panic!("vga virtual address was not mapped")
+        };
+    }
+
+    // // We know that physical address 0 is mapped & uses huge pages (This could be flaky down the line)
+    #[test_case]
+    fn translate_address_0() {
+        // Physical Address 0 is at the map offset + 0
+        let addr = get_offset();
+        let phys_addr = translate_addr(addr);
+
+        match phys_addr {
+            Some(pa) => assert_eq!(pa.as_u64(), 0),
+            None => panic!("physical memory was not mapped")
+        };
+    }
+
+    #[test_case]
+    fn translate_missing_address() {
+        let addr = VirtAddr::new(0xDEADBEEF);
+        let phys_addr = translate_addr(addr);
+
+        match phys_addr {
+            Some(pa) => panic!("0xDEADBEEF was mapped to {} unexpectedly", pa.as_u64()),
+            None => ()
+        };
+    }
+
+    // Add entries to page table
+    // Add entry to page table (different types too) and see if we can read it back
+}
