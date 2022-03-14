@@ -7,7 +7,6 @@
 
 use bootloader::BootInfo;
 use core::panic::PanicInfo;
-use x86_64::VirtAddr;
 
 pub mod gdt;
 pub mod interrupts;
@@ -15,12 +14,13 @@ pub mod memory;
 pub mod process;
 pub mod serial;
 pub mod vga_buffer;
+pub mod virt_addr;
 
 pub fn init(boot_info: &BootInfo) {
     gdt::init();
     interrupts::init_idt();
     interrupts::init_pics();
-    unsafe { memory::init(VirtAddr::new(boot_info.physical_memory_offset)) }; // We're getting the offset from the boot info so this is safe
+    unsafe { memory::init(boot_info.physical_memory_offset) }; // We're getting the offset from the boot info so this is safe
     x86_64::instructions::interrupts::enable();
 }
 

@@ -1,17 +1,22 @@
+use core::ops::Index;
+
 use spin::Once;
 use x86_64::registers::control::Cr3;
 use x86_64::structures::paging::page_table::FrameError;
 use x86_64::structures::paging::PageTable;
-use x86_64::{PhysAddr, VirtAddr};
+use x86_64::PhysAddr;
 
-static PHYSICAL_OFFSET: Once<VirtAddr> = Once::new();
+use crate::println;
+use crate::virt_addr::VirtAddr;
+
+static PHYSICAL_OFFSET: Once<u64> = Once::new();
 
 /// Initialize the viritual memory system
 ///
 /// This function is unsafe as the caller must ensure the physical memory is mapped at the offset specified
 /// or terrible things will happen. The other calls in this module rely on the fact that once the memory system
 /// is initialized further calls are safe as long as the init call satisfied the requirements above
-pub unsafe fn init(physical_memory_offset: VirtAddr) {
+pub unsafe fn init(physical_memory_offset: u64) {
     PHYSICAL_OFFSET.call_once(|| physical_memory_offset);
 }
 
@@ -45,14 +50,16 @@ fn translate_addr_inner(addr: VirtAddr) -> Option<PhysAddr> {
         addr.p4_index(),
         addr.p3_index(),
         addr.p2_index(),
-        addr.p1_index(),
+        addr.level1_index(),
     ];
     let mut frame = level_4_table_frame;
 
     for &index in &table_indices {
+        println!("{:?}", frame);
+        println!("Index: {:?}", index);
         // Convert the frame into a page table reference
         let virt = physical_memory_offset + frame.start_address().as_u64();
-        let table_ptr: *const PageTable = virt.as_ptr();
+        let table_ptr: *const PageTable2 = virt.as_ptr();
         let table = unsafe { &*table_ptr };
 
         let entry = &table[index];
@@ -73,12 +80,72 @@ fn get_offset() -> VirtAddr {
     }
 }
 
+// trait PageSize {
+//     const SIZE: u64;
+// }
+
+// #[derive(Debug)]
+// enum Size4KB {}
+
+// impl PageSize for Size4KB {
+//     const SIZE: u64 = 512;
+// }
+
+const PAGE_TABLE_SIZE: usize = 512;
+
+#[repr(align(4096))]
+#[repr(C)]
+struct PageTable2 {
+    entries: [u64; PAGE_TABLE_SIZE],
+}
+
+impl Index<usize> for PageTable2 {
+    type Output = u64;
+
+    #[inline]
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.entries[index]
+    }
+}
+
+#[derive(Debug)]
+pub struct PageTableIndex(u16);
+
+impl PageTableIndex {
+    /// Create a new index, truncating all but the lower 9 bits
+    #[inline]
+    pub fn new_truncate(index: u16) -> PageTableIndex {
+        PageTableIndex(index)
+    }
+}
+
+impl From<PageTableIndex> for usize {
+    #[inline]
+    fn from(index: PageTableIndex) -> Self {
+        usize::from(index.0)
+    }
+}
+
+impl From<PageTableIndex> for u64 {
+    #[inline]
+    fn from(index: PageTableIndex) -> Self {
+        u64::from(index.0)
+    }
+}
+
+impl From<PageTableIndex> for u16 {
+    #[inline]
+    fn from(index: PageTableIndex) -> Self {
+        index.0
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use x86_64::VirtAddr;
     use crate::vga_buffer::VGA_BUFFER_ADDRESS;
+    use x86_64::VirtAddr;
 
-    use super::{translate_addr, get_offset};
+    use super::{get_offset, translate_addr};
 
     // We know the VGA buffer is identity mapped by the bootloader
     #[test_case]
@@ -88,7 +155,7 @@ mod tests {
 
         match phys_addr {
             Some(pa) => assert_eq!(addr.as_u64(), pa.as_u64()),
-            None => panic!("vga virtual address was not mapped")
+            None => panic!("vga virtual address was not mapped"),
         };
     }
 
@@ -101,7 +168,7 @@ mod tests {
 
         match phys_addr {
             Some(pa) => assert_eq!(pa.as_u64(), 0),
-            None => panic!("physical memory was not mapped")
+            None => panic!("physical memory was not mapped"),
         };
     }
 
@@ -112,7 +179,7 @@ mod tests {
 
         match phys_addr {
             Some(pa) => panic!("0xDEADBEEF was mapped to {} unexpectedly", pa.as_u64()),
-            None => ()
+            None => (),
         };
     }
 

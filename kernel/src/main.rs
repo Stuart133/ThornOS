@@ -20,9 +20,9 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     test_main();
 
     let addresses = [
-        kernel::vga_buffer::VGA_BUFFER_ADDRESS, // vga buffer
-        0x201008,
-        0x0100_0020_1a10,
+        // kernel::vga_buffer::VGA_BUFFER_ADDRESS, // vga buffer
+        // 0x201008,
+        // 0x0100_0020_1a10,
         boot_info.physical_memory_offset, // Physical address 0
     ];
 
