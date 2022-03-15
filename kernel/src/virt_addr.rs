@@ -1,4 +1,4 @@
-use crate::memory::{PageOffset, PageTableIndex};
+use crate::paging::{PageOffset, PageTableIndex};
 
 #[derive(Debug)]
 #[repr(transparent)]
