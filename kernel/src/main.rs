@@ -6,8 +6,7 @@
 
 use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
-use kernel::{memory::translate_addr, println};
-use x86_64::VirtAddr;
+use kernel::{memory::translate_addr, println, virt_addr::VirtAddr};
 
 entry_point!(kernel_main);
 
@@ -28,7 +27,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
     for &addr in &addresses {
         let virt = VirtAddr::new(addr);
-        let phys = translate_addr(virt);
+        let phys = translate_addr(&virt);
         println!("{:?} -> {:?}", virt, phys);
     }
 
