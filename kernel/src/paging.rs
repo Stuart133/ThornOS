@@ -1,5 +1,8 @@
+use x86_64::{structures::paging::PhysFrame, PhysAddr};
+
 /// Guaranteed to hold only values from 0..4096
 #[derive(Debug)]
+#[repr(transparent)]
 pub struct PageOffset(u16);
 
 impl PageOffset {
@@ -16,8 +19,16 @@ impl From<PageOffset> for u16 {
     }
 }
 
+impl From<PageOffset> for u64 {
+    #[inline]
+    fn from(index: PageOffset) -> Self {
+        index.0 as u64
+    }
+}
+
 /// Guaranteed to hold only values from 0..512
 #[derive(Debug)]
+#[repr(transparent)]
 pub struct PageTableIndex(u16);
 
 impl PageTableIndex {
@@ -46,6 +57,23 @@ impl From<PageTableIndex> for u16 {
     #[inline]
     fn from(index: PageTableIndex) -> Self {
         index.0
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+#[repr(transparent)]
+pub struct PageTableEntry(u64);
+
+impl PageTableEntry {
+    pub fn frame(self) -> PhysFrame {
+        match PhysFrame::from_start_address(self.addr()) {
+            Ok(f) => f,
+            Err(_) => todo!(),
+        }
+    }
+
+    fn addr(self) -> PhysAddr {
+        PhysAddr::new(self.0 & 0x000F_FFFF_FFFF_F000)
     }
 }
 

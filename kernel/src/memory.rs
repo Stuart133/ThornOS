@@ -2,10 +2,11 @@ use core::ops::Index;
 
 use spin::Once;
 use x86_64::registers::control::Cr3;
+use x86_64::structures::paging::PhysFrame;
 use x86_64::structures::paging::page_table::FrameError;
-use x86_64::structures::paging::PageTable;
 use x86_64::PhysAddr;
 
+use crate::paging::{PageTableIndex, PageTableEntry};
 use crate::println;
 use crate::virt_addr::VirtAddr;
 
@@ -42,7 +43,7 @@ pub fn translate_addr(addr: &VirtAddr) -> Option<PhysAddr> {
 }
 
 fn translate_addr_inner(addr: &VirtAddr) -> Option<PhysAddr> {
-    let physical_memory_offset = get_offset();
+    let physical_memory_offset = &get_offset();
 
     let (level_4_table_frame, _) = Cr3::read();
 
@@ -54,25 +55,19 @@ fn translate_addr_inner(addr: &VirtAddr) -> Option<PhysAddr> {
     ];
     let mut frame = level_4_table_frame;
 
-    return None;
+    for index in table_indices {
+        println!("{:?}", frame);
+        println!("Index: {:?}", index);
+        // Convert the frame into a page table reference
+        let virt = physical_memory_offset + frame.start_address().as_u64();
+        let table_ptr: *const PageTable = virt.as_ptr();
+        let table = unsafe { &*table_ptr };
 
-    // for &index in &table_indices {
-    //     println!("{:?}", frame);
-    //     println!("Index: {:?}", index);
-    //     // Convert the frame into a page table reference
-    //     let virt = physical_memory_offset + frame.start_address().as_u64();
-    //     let table_ptr: *const PageTable2 = virt.as_ptr();
-    //     let table = unsafe { &*table_ptr };
+        let entry = table[index];
+        frame = entry.frame()
+    }
 
-    //     let entry = &table[index];
-    //     frame = match entry.frame() {
-    //         Ok(frame) => frame,
-    //         Err(FrameError::FrameNotPresent) => return None,
-    //         Err(FrameError::HugeFrame) => panic!("huge pages not supported"),
-    //     };
-    // }
-
-    // Some(frame.start_address() + u64::from(addr.page_offset()))
+    Some(frame.start_address() + u64::from(addr.page_offset()))
 }
 
 fn get_offset() -> VirtAddr {
@@ -86,12 +81,12 @@ const PAGE_TABLE_SIZE: usize = 512;
 
 #[repr(align(4096))]
 #[repr(C)]
-struct PageTable2 {
-    entries: [u64; PAGE_TABLE_SIZE],
+struct PageTable {
+    entries: [PageTableEntry; PAGE_TABLE_SIZE],
 }
 
-impl Index<usize> for PageTable2 {
-    type Output = u64;
+impl Index<usize> for PageTable {
+    type Output = PageTableEntry;
 
     #[inline]
     fn index(&self, index: usize) -> &Self::Output {
@@ -99,48 +94,57 @@ impl Index<usize> for PageTable2 {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use crate::{vga_buffer::VGA_BUFFER_ADDRESS, virt_addr::VirtAddr};
+impl Index<PageTableIndex> for PageTable {
+    type Output = PageTableEntry;
 
-//     use super::{get_offset, translate_addr};
+    #[inline]
+    fn index(&self, index: PageTableIndex) -> &Self::Output {
+        &self.entries[usize::from(index)]
+    }
+}
 
-//     // We know the VGA buffer is identity mapped by the bootloader
-//     #[test_case]
-//     fn translate_vga_address() {
-//         let addr = VirtAddr::new(VGA_BUFFER_ADDRESS);
-//         let phys_addr = translate_addr(&addr);
+#[cfg(test)]
+mod tests {
+    use crate::{vga_buffer::VGA_BUFFER_ADDRESS, virt_addr::VirtAddr};
 
-//         match phys_addr {
-//             Some(pa) => assert_eq!(addr.as_u64(), pa.as_u64()),
-//             None => panic!("vga virtual address was not mapped"),
-//         };
-//     }
+    use super::{get_offset, translate_addr};
 
-//     // // We know that physical address 0 is mapped & uses huge pages (This could be flaky down the line)
-//     #[test_case]
-//     fn translate_address_0() {
-//         // Physical Address 0 is at the map offset + 0
-//         let addr = get_offset();
-//         let phys_addr = translate_addr(&addr);
+    // We know the VGA buffer is identity mapped by the bootloader
+    #[test_case]
+    fn translate_vga_address() {
+        let addr = VirtAddr::new(VGA_BUFFER_ADDRESS);
+        let phys_addr = translate_addr(&addr);
 
-//         match phys_addr {
-//             Some(pa) => assert_eq!(pa.as_u64(), 0),
-//             None => panic!("physical memory was not mapped"),
-//         };
-//     }
+        match phys_addr {
+            Some(pa) => assert_eq!(addr.as_u64(), pa.as_u64()),
+            None => panic!("vga virtual address was not mapped"),
+        };
+    }
 
-//     #[test_case]
-//     fn translate_missing_address() {
-//         let addr = VirtAddr::new(0xDEADBEEF);
-//         let phys_addr = translate_addr(&addr);
+    // // We know that physical address 0 is mapped & uses huge pages (This could be flaky down the line)
+    #[test_case]
+    fn translate_address_0() {
+        // Physical Address 0 is at the map offset + 0
+        let addr = get_offset();
+        let phys_addr = translate_addr(&addr);
 
-//         match phys_addr {
-//             Some(pa) => panic!("0xDEADBEEF was mapped to {} unexpectedly", pa.as_u64()),
-//             None => (),
-//         };
-//     }
+        match phys_addr {
+            Some(pa) => assert_eq!(pa.as_u64(), 0),
+            None => panic!("physical memory was not mapped"),
+        };
+    }
 
-//     // Add entries to page table
-//     // Add entry to page table (different types too) and see if we can read it back
-// }
+    #[test_case]
+    fn translate_missing_address() {
+        let addr = VirtAddr::new(0xDEADBEEF);
+        let phys_addr = translate_addr(&addr);
+
+        match phys_addr {
+            Some(pa) => panic!("0xDEADBEEF was mapped to {} unexpectedly", pa.as_u64()),
+            None => (),
+        };
+    }
+
+    // Add entries to page table
+    // Add entry to page table (different types too) and see if we can read it back
+}

@@ -1,3 +1,5 @@
+use core::ops::Add;
+
 use crate::paging::{PageOffset, PageTableIndex};
 
 #[derive(Debug)]
@@ -42,6 +44,20 @@ impl VirtAddr {
     #[inline]
     pub fn as_u64(&self) -> u64 {
         self.0
+    }
+
+    #[inline]
+    pub fn as_ptr<T>(self) -> *const T {
+        self.0 as *const T
+    }
+}
+
+impl Add<u64> for &VirtAddr {
+    type Output = VirtAddr;
+
+    #[inline]
+    fn add(self, rhs: u64) -> Self::Output {
+        VirtAddr::new(self.0 + rhs)
     }
 }
 
