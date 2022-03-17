@@ -1,5 +1,6 @@
 use core::ops::Index;
 
+use bitflags::bitflags;
 use x86_64::{
     structures::paging::{PhysFrame, Size1GiB, Size2MiB, Size4KiB},
     PhysAddr,
@@ -98,36 +99,43 @@ pub enum Phys {
     Size1Gb(PhysFrame<Size1GiB>),
 }
 
+bitflags! {
+    struct PageTableEntryFlags: u64 {
+        const PRESENT = 1;
+        const WRITABLE = 1 << 1;
+        const USER_ACCESSIBLE = 1 << 2;
+        const WRITE_THROUGH = 1 << 3;
+        const DISABLE_CACHE = 1 << 4;
+        const ACCESSED = 1 << 5;
+        const DIRTY = 1 << 6;
+        const HUGE_PAGE = 1 << 7;
+        const GLOBAL = 1 << 8;
+        const NO_EXECUTE = 1 << 63;
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 #[repr(transparent)]
 pub struct PageTableEntry(u64);
 
 impl PageTableEntry {
-    // TODO - Consider using a result here
     pub fn frame(self, level: usize) -> Option<Phys> {
-        if !self.page_mapped() {
+        if !self.flags().contains(PageTableEntryFlags::PRESENT) {
             return None;
         }
 
-        if self.huge_page() {
-            if level == 3 {
-                match PhysFrame::<Size1GiB>::from_start_address(self.addr()) {
-                    Ok(f) => Some(Phys::Size1Gb(f)),
-                    Err(_) => None,
-                }
-            } else if level == 2 {
-                match PhysFrame::<Size2MiB>::from_start_address(self.addr()) {
-                    Ok(f) => Some(Phys::Size2Mb(f)),
-                    Err(_) => None,
-                }
-            } else {
-                None
+        if self.flags().contains(PageTableEntryFlags::HUGE_PAGE) {
+            match level {
+                2 => Some(Phys::Size1Gb(PhysFrame::<Size1GiB>::containing_address(
+                    self.addr(),
+                ))),
+                3 => Some(Phys::Size2Mb(PhysFrame::<Size2MiB>::containing_address(
+                    self.addr(),
+                ))),
+                _ => None,
             }
         } else {
-            match PhysFrame::from_start_address(self.addr()) {
-                Ok(f) => Some(Phys::Size4Kb(f)),
-                Err(_) => None,
-            }
+            Some(Phys::Size4Kb(PhysFrame::containing_address(self.addr())))
         }
     }
 
@@ -137,13 +145,8 @@ impl PageTableEntry {
     }
 
     #[inline]
-    fn page_mapped(self) -> bool {
-        (self.0 & 1) == 1
-    }
-
-    #[inline]
-    fn huge_page(self) -> bool {
-        ((self.0 >> 7) & 1) == 1
+    fn flags(self) -> PageTableEntryFlags {
+        PageTableEntryFlags::from_bits_truncate(self.0)
     }
 }
 
