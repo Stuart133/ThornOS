@@ -2,11 +2,11 @@ use core::ops::Index;
 
 use spin::Once;
 use x86_64::registers::control::Cr3;
-use x86_64::structures::paging::PhysFrame;
 use x86_64::structures::paging::page_table::FrameError;
+use x86_64::structures::paging::PhysFrame;
 use x86_64::PhysAddr;
 
-use crate::paging::{PageTableIndex, PageTableEntry};
+use crate::paging::{PageTableEntry, PageTableIndex, Phys};
 use crate::println;
 use crate::virt_addr::VirtAddr;
 
@@ -53,9 +53,9 @@ fn translate_addr_inner(addr: &VirtAddr) -> Option<PhysAddr> {
         addr.level2_index(),
         addr.level1_index(),
     ];
-    let mut frame = level_4_table_frame;
+    let mut frame: Phys = level_4_table_frame.into();
 
-    for index in table_indices {
+    for (i, index) in table_indices.iter().enumerate() {
         println!("{:?}", frame);
         println!("Index: {:?}", index);
         // Convert the frame into a page table reference
@@ -63,8 +63,11 @@ fn translate_addr_inner(addr: &VirtAddr) -> Option<PhysAddr> {
         let table_ptr: *const PageTable = virt.as_ptr();
         let table = unsafe { &*table_ptr };
 
-        let entry = table[index];
-        frame = entry.frame()
+        let entry = table[*index];
+        match entry.frame(i) {
+            Some(f) => frame = f,
+            None => return None,
+        }
     }
 
     Some(frame.start_address() + u64::from(addr.page_offset()))

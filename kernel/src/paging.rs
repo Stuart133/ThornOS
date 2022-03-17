@@ -1,4 +1,7 @@
-use x86_64::{structures::paging::PhysFrame, PhysAddr};
+use x86_64::{
+    structures::paging::{PhysFrame, Size1GiB, Size2MiB, Size4KiB},
+    PhysAddr,
+};
 
 /// Guaranteed to hold only values from 0..4096
 #[derive(Debug)]
@@ -27,7 +30,7 @@ impl From<PageOffset> for u64 {
 }
 
 /// Guaranteed to hold only values from 0..512
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 #[repr(transparent)]
 pub struct PageTableIndex(u16);
 
@@ -60,20 +63,66 @@ impl From<PageTableIndex> for u16 {
     }
 }
 
+#[derive(Debug)]
+pub enum Phys {
+    Size4Kb(PhysFrame<Size4KiB>),
+    Size2Mb(PhysFrame<Size2MiB>),
+    Size1Gb(PhysFrame<Size1GiB>),
+}
+
 #[derive(Debug, Clone, Copy)]
 #[repr(transparent)]
 pub struct PageTableEntry(u64);
 
 impl PageTableEntry {
-    pub fn frame(self) -> PhysFrame {
-        match PhysFrame::from_start_address(self.addr()) {
-            Ok(f) => f,
-            Err(_) => todo!(),
+    // TODO - Consider using a result here
+    pub fn frame(self, level: usize) -> Option<Phys> {
+        if self.huge_page() {
+            if level == 3 {
+                match PhysFrame::<Size2MiB>::from_start_address(self.addr()) {
+                    Ok(f) => Some(Phys::Size2Mb(f)),
+                    Err(_) => None,
+                }
+            } else if level == 2 {
+                match PhysFrame::<Size1GiB>::from_start_address(self.addr()) {
+                    Ok(f) => Some(Phys::Size1Gb(f)),
+                    Err(_) => None,
+                }
+            } else {
+                None
+            }
+        } else {
+            match PhysFrame::from_start_address(self.addr()) {
+                Ok(f) => Some(Phys::Size4Kb(f)),
+                Err(_) => None,
+            }
         }
     }
 
+    #[inline]
     fn addr(self) -> PhysAddr {
         PhysAddr::new(self.0 & 0x000F_FFFF_FFFF_F000)
+    }
+
+    #[inline]
+    fn huge_page(self) -> bool {
+        self.0 & (1 << 7) == 1
+    }
+}
+
+impl Phys {
+    pub fn start_address(self) -> PhysAddr {
+        match self {
+            Phys::Size4Kb(f) => f.start_address(),
+            Phys::Size2Mb(f) => f.start_address(),
+            Phys::Size1Gb(f) => f.start_address(),
+        }
+    }
+}
+
+impl From<PhysFrame> for Phys {
+    fn from(p: PhysFrame) -> Self {
+        Phys::Size4Kb(p)
     }
 }
 
