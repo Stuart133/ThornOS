@@ -64,8 +64,14 @@ fn translate_addr_inner(addr: &VirtAddr) -> Option<PhysAddr> {
         let table = unsafe { &*table_ptr };
 
         let entry = table[*index];
-        match entry.frame(i) {
-            Some(f) => frame = f,
+        match entry.frame(4 - i) {
+            Some(f) => match f {
+                Phys::Size2Mb(_) | Phys::Size1Gb(_) => {
+                    frame = f;
+                    break;
+                }
+                _ => frame = f,
+            },
             None => return None,
         }
     }

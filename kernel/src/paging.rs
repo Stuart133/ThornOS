@@ -3,6 +3,8 @@ use x86_64::{
     PhysAddr,
 };
 
+use crate::println;
+
 /// Guaranteed to hold only values from 0..4096
 #[derive(Debug)]
 #[repr(transparent)]
@@ -79,13 +81,13 @@ impl PageTableEntry {
     pub fn frame(self, level: usize) -> Option<Phys> {
         if self.huge_page() {
             if level == 3 {
-                match PhysFrame::<Size2MiB>::from_start_address(self.addr()) {
-                    Ok(f) => Some(Phys::Size2Mb(f)),
+                match PhysFrame::<Size1GiB>::from_start_address(self.addr()) {
+                    Ok(f) => Some(Phys::Size1Gb(f)),
                     Err(_) => None,
                 }
             } else if level == 2 {
-                match PhysFrame::<Size1GiB>::from_start_address(self.addr()) {
-                    Ok(f) => Some(Phys::Size1Gb(f)),
+                match PhysFrame::<Size2MiB>::from_start_address(self.addr()) {
+                    Ok(f) => Some(Phys::Size2Mb(f)),
                     Err(_) => None,
                 }
             } else {
@@ -106,7 +108,7 @@ impl PageTableEntry {
 
     #[inline]
     fn huge_page(self) -> bool {
-        self.0 & (1 << 7) == 1
+        ((self.0 >> 7) & 1) == 1
     }
 }
 
