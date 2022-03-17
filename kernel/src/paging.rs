@@ -79,6 +79,10 @@ pub struct PageTableEntry(u64);
 impl PageTableEntry {
     // TODO - Consider using a result here
     pub fn frame(self, level: usize) -> Option<Phys> {
+        if !self.page_mapped() {
+            return None
+        }
+
         if self.huge_page() {
             if level == 3 {
                 match PhysFrame::<Size1GiB>::from_start_address(self.addr()) {
@@ -104,6 +108,11 @@ impl PageTableEntry {
     #[inline]
     fn addr(self) -> PhysAddr {
         PhysAddr::new(self.0 & 0x000F_FFFF_FFFF_F000)
+    }
+
+    #[inline]
+    fn page_mapped(self) -> bool {
+        (self.0 & 1) == 1
     }
 
     #[inline]

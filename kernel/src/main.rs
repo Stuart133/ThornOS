@@ -18,13 +18,11 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     #[cfg(test)]
     test_main();
 
-    println!("{}", boot_info.physical_memory_offset);
-
     let addresses = [
         // kernel::vga_buffer::VGA_BUFFER_ADDRESS, // vga buffer
         // 0x201008,
         // 0x0100_0020_1a10,
-        boot_info.physical_memory_offset, // Physical address 0
+        0xDEADBEEF, // Physical address 0
     ];
 
     for &addr in &addresses {

@@ -39,10 +39,6 @@ pub unsafe fn init(physical_memory_offset: u64) {
 
 /// Translate a virtual address into a physical one
 pub fn translate_addr(addr: &VirtAddr) -> Option<PhysAddr> {
-    translate_addr_inner(addr)
-}
-
-fn translate_addr_inner(addr: &VirtAddr) -> Option<PhysAddr> {
     let physical_memory_offset = &get_offset();
 
     let (level_4_table_frame, _) = Cr3::read();
