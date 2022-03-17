@@ -2,7 +2,7 @@ use core::ops::Add;
 
 use crate::paging::{PageOffset, PageTableIndex};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 #[repr(transparent)]
 pub struct VirtAddr(u64);
 
@@ -52,7 +52,7 @@ impl VirtAddr {
     }
 }
 
-impl Add<u64> for &VirtAddr {
+impl Add<u64> for VirtAddr {
     type Output = VirtAddr;
 
     #[inline]
