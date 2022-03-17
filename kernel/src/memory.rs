@@ -1,12 +1,8 @@
-use core::ops::Index;
-
 use spin::Once;
 use x86_64::registers::control::Cr3;
-use x86_64::structures::paging::page_table::FrameError;
-use x86_64::structures::paging::PhysFrame;
 use x86_64::PhysAddr;
 
-use crate::paging::{PageTableEntry, PageTableIndex, Phys};
+use crate::paging::{PageTable, Phys};
 use crate::println;
 use crate::virt_addr::VirtAddr;
 
@@ -20,22 +16,6 @@ static PHYSICAL_OFFSET: Once<u64> = Once::new();
 pub unsafe fn init(physical_memory_offset: u64) {
     PHYSICAL_OFFSET.call_once(|| physical_memory_offset);
 }
-
-/// Return a mutable reference to the active page table
-///
-/// This is unsafe as multiple calls will cause the mutable reference to be aliased
-/// TODO - Investigate safer shared reference implementations
-// pub unsafe fn active_level_4_table() -> &'static mut PageTable {
-//     let physical_memory_offset = get_offset();
-
-//     let (level_4_table_frame, _) = Cr3::read();
-
-//     let phys = level_4_table_frame.start_address();
-//     let virt = physical_memory_offset + phys.as_u64();
-//     let page_table_ptr: *mut PageTable = virt.as_mut_ptr();
-
-//     &mut *page_table_ptr
-// }
 
 /// Translate a virtual address into a physical one
 pub fn translate_addr(addr: &VirtAddr) -> Option<PhysAddr> {
@@ -79,32 +59,6 @@ fn get_offset() -> VirtAddr {
     match PHYSICAL_OFFSET.wait() {
         Some(offset) => VirtAddr::new(*offset),
         None => panic!("virtual memory system is not initialized"),
-    }
-}
-
-const PAGE_TABLE_SIZE: usize = 512;
-
-#[repr(align(4096))]
-#[repr(C)]
-struct PageTable {
-    entries: [PageTableEntry; PAGE_TABLE_SIZE],
-}
-
-impl Index<usize> for PageTable {
-    type Output = PageTableEntry;
-
-    #[inline]
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.entries[index]
-    }
-}
-
-impl Index<PageTableIndex> for PageTable {
-    type Output = PageTableEntry;
-
-    #[inline]
-    fn index(&self, index: PageTableIndex) -> &Self::Output {
-        &self.entries[usize::from(index)]
     }
 }
 

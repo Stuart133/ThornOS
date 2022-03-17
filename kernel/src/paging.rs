@@ -1,9 +1,35 @@
+use core::ops::Index;
+
 use x86_64::{
     structures::paging::{PhysFrame, Size1GiB, Size2MiB, Size4KiB},
     PhysAddr,
 };
 
-use crate::println;
+const PAGE_TABLE_SIZE: usize = 512;
+
+#[repr(align(4096))]
+#[repr(C)]
+pub struct PageTable {
+    entries: [PageTableEntry; PAGE_TABLE_SIZE],
+}
+
+impl Index<usize> for PageTable {
+    type Output = PageTableEntry;
+
+    #[inline]
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.entries[index]
+    }
+}
+
+impl Index<PageTableIndex> for PageTable {
+    type Output = PageTableEntry;
+
+    #[inline]
+    fn index(&self, index: PageTableIndex) -> &Self::Output {
+        &self.entries[usize::from(index)]
+    }
+}
 
 /// Guaranteed to hold only values from 0..4096
 #[derive(Debug)]
@@ -80,7 +106,7 @@ impl PageTableEntry {
     // TODO - Consider using a result here
     pub fn frame(self, level: usize) -> Option<Phys> {
         if !self.page_mapped() {
-            return None
+            return None;
         }
 
         if self.huge_page() {

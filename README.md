@@ -31,8 +31,7 @@ Ideally ThornOS will have zero external dependencies. Some core components to re
 
 - bootloader
 - x86 crate
-  - VirtAddr
-  - PageTable
+  - Phys Frame
   - Phys Addr
   - Interrupt Descriptor Table
 - spinlocks
