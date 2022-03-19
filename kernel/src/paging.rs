@@ -100,7 +100,7 @@ pub enum Phys {
 }
 
 bitflags! {
-    struct PageTableEntryFlags: u64 {
+    pub struct PageTableEntryFlags: u64 {
         const PRESENT = 1;
         const WRITABLE = 1 << 1;
         const USER_ACCESSIBLE = 1 << 2;
@@ -126,13 +126,13 @@ impl PageTableEntry {
 
         if self.flags().contains(PageTableEntryFlags::HUGE_PAGE) {
             match level {
-                2 => Some(Phys::Size1Gb(PhysFrame::<Size1GiB>::containing_address(
+                1 => Some(Phys::Size1Gb(PhysFrame::<Size1GiB>::containing_address(
                     self.addr(),
                 ))),
-                3 => Some(Phys::Size2Mb(PhysFrame::<Size2MiB>::containing_address(
+                2 => Some(Phys::Size2Mb(PhysFrame::<Size2MiB>::containing_address(
                     self.addr(),
                 ))),
-                _ => None,
+                _ => panic!("huge page mapped at level {}", level + 1),
             }
         } else {
             Some(Phys::Size4Kb(PhysFrame::containing_address(self.addr())))
@@ -145,7 +145,7 @@ impl PageTableEntry {
     }
 
     #[inline]
-    fn flags(self) -> PageTableEntryFlags {
+    pub fn flags(self) -> PageTableEntryFlags {
         PageTableEntryFlags::from_bits_truncate(self.0)
     }
 }

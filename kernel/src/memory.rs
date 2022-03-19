@@ -1,9 +1,9 @@
 use spin::Once;
 use x86_64::registers::control::Cr3;
+use x86_64::structures::paging::PhysFrame;
 use x86_64::PhysAddr;
 
-use crate::paging::{PageTable, Phys};
-use crate::println;
+use crate::paging::{PageTable, PageTableEntry, PageTableEntryFlags, Phys};
 use crate::virt_addr::VirtAddr;
 
 static PHYSICAL_OFFSET: Once<u64> = Once::new();
@@ -19,28 +19,35 @@ pub unsafe fn init(physical_memory_offset: u64) {
 
 /// Translate a virtual address into a physical one
 pub fn translate_addr(addr: &VirtAddr) -> Option<PhysAddr> {
-    let physical_memory_offset = get_offset();
-
     let (level_4_table_frame, _) = Cr3::read();
 
-    let table_indices = [
-        addr.level4_index(),
-        addr.level3_index(),
-        addr.level2_index(),
-        addr.level1_index(),
-    ];
-    let mut frame: Phys = level_4_table_frame.into();
+    let frame = walk(level_4_table_frame.into(), addr);
+    frame.map(|f| f.start_address() + u64::from(addr.page_offset()))
+}
 
-    for (i, index) in table_indices.iter().enumerate() {
-        println!("{:?}", frame);
-        println!("Index: {:?}", index);
+/// Create a new page table mapping
+///
+/// This is unsafe because if we map to an existing frame
+/// we can create aliased mutable references
+unsafe fn create_mapping(addr: VirtAddr, frame: PhysFrame, flags: PageTableEntryFlags) {
+    // TODO: Replace addr with page
+}
+
+fn walk(table: Phys, addr: &VirtAddr) -> Option<Phys> {
+    let physical_memory_offset = get_offset();
+
+    let mut frame: Phys = table;
+
+    for i in 0..4 {
+        let index = addr.page_table_index(3 - i);
+
         // Convert the frame into a page table reference
         let virt = physical_memory_offset + frame.start_address().as_u64();
         let table_ptr: *const PageTable = virt.as_ptr();
         let table = unsafe { &*table_ptr };
 
-        let entry = table[*index];
-        match entry.frame(4 - i) {
+        let entry = table[index];
+        match entry.frame(3 - i) {
             Some(f) => match f {
                 Phys::Size2Mb(_) | Phys::Size1Gb(_) => {
                     frame = f;
@@ -52,7 +59,7 @@ pub fn translate_addr(addr: &VirtAddr) -> Option<PhysAddr> {
         }
     }
 
-    Some(frame.start_address() + u64::from(addr.page_offset()))
+    Some(frame)
 }
 
 fn get_offset() -> VirtAddr {
