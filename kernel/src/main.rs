@@ -6,7 +6,7 @@
 
 use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
-use kernel::{memory::translate_addr, println, virt_addr::VirtAddr};
+use kernel::{memory::{translate_addr, create_mapping}, println, virt_addr::VirtAddr, paging::{PageTable, PageTableEntryFlags, PageTableEntry}};
 
 entry_point!(kernel_main);
 
@@ -19,11 +19,20 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     test_main();
 
     let addresses = [
-        // kernel::vga_buffer::VGA_BUFFER_ADDRESS, // vga buffer
+        kernel::vga_buffer::VGA_BUFFER_ADDRESS, // vga buffer
         // 0x201008,
         // 0x0100_0020_1a10,
-        0xDEADBEEF, // Physical address 0
+        // boot_info.physical_memory_offset, // Physical address 0
     ];
+
+    for &addr in &addresses {
+        let virt = VirtAddr::new(addr);
+        let phys = translate_addr(&virt);
+        println!("{:#x} -> {:?}", virt.as_u64(), phys);
+    }
+
+    let entry = PageTableEntry::new(PageTableEntryFlags::PRESENT | PageTableEntryFlags::WRITABLE);
+    unsafe {create_mapping(&VirtAddr::new(kernel::vga_buffer::VGA_BUFFER_ADDRESS), entry);}
 
     for &addr in &addresses {
         let virt = VirtAddr::new(addr);

@@ -32,6 +32,11 @@ impl VirtAddr {
     pub fn as_ptr<T>(self) -> *const T {
         self.0 as *const T
     }
+
+    #[inline]
+    pub fn as_mut_ptr<T>(self) -> *mut T {
+        self.0 as *mut T
+    }
 }
 
 impl Add<u64> for VirtAddr {

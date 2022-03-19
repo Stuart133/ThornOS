@@ -1,4 +1,4 @@
-use core::ops::Index;
+use core::ops::{Index, IndexMut};
 
 use bitflags::bitflags;
 use x86_64::{
@@ -12,6 +12,12 @@ const PAGE_TABLE_SIZE: usize = 512;
 #[repr(C)]
 pub struct PageTable {
     entries: [PageTableEntry; PAGE_TABLE_SIZE],
+}
+
+impl PageTable {
+    pub fn add_entry(mut self, pte: PageTableEntry, index: PageTableIndex) {
+        self.entries[usize::from(index)] = pte
+    }
 }
 
 impl Index<usize> for PageTable {
@@ -29,6 +35,20 @@ impl Index<PageTableIndex> for PageTable {
     #[inline]
     fn index(&self, index: PageTableIndex) -> &Self::Output {
         &self.entries[usize::from(index)]
+    }
+}
+
+impl IndexMut<usize> for PageTable {
+    #[inline]
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.entries[index]
+    }
+}
+
+impl IndexMut<PageTableIndex> for PageTable {
+    #[inline]
+    fn index_mut(&mut self, index: PageTableIndex) -> &mut Self::Output {
+        &mut self.entries[usize::from(index)]
     }
 }
 
@@ -119,6 +139,10 @@ bitflags! {
 pub struct PageTableEntry(u64);
 
 impl PageTableEntry {
+    pub fn new(flags: PageTableEntryFlags) -> PageTableEntry {
+        PageTableEntry(flags.bits)
+    }
+
     pub fn frame(self, level: usize) -> Option<Phys> {
         if !self.flags().contains(PageTableEntryFlags::PRESENT) {
             return None;
