@@ -21,8 +21,17 @@ pub unsafe fn init(physical_memory_offset: u64) {
 pub fn translate_addr(addr: &VirtAddr) -> Option<PhysAddr> {
     let (level_4_table_frame, _) = Cr3::read();
 
-    let frame = walk(level_4_table_frame.into(), addr);
-    frame.map(|f| f.start_address() + u64::from(addr.page_offset()))
+    let (entry, level) = walkpte(level_4_table_frame.into(), addr);
+
+    match entry {
+        Some(pte) => match pte.frame(level) {
+            Some(f) => Some(f.start_address() + u64::from(addr.page_offset())),
+            None => None,
+        },
+        None => None,
+    }
+
+    // frame.map(|f| f.start_address() + u64::from(addr.page_offset()))
 }
 
 /// Create a new page table mapping
@@ -33,6 +42,35 @@ unsafe fn create_mapping(addr: VirtAddr, frame: PhysFrame, flags: PageTableEntry
     // TODO: Replace addr with page
 }
 
+fn walkpte(table: Phys, addr: &VirtAddr) -> (Option<PageTableEntry>, usize) {
+    let physical_memory_offset = get_offset();
+
+    let mut frame: Phys = table;
+
+    let mut entry: Option<PageTableEntry> = None;
+    for i in 0..4 {
+        let level = 3 - i;
+        let index = addr.page_table_index(level);
+
+        // Convert the frame into a page table reference
+        let virt = physical_memory_offset + frame.start_address().as_u64();
+        let table_ptr: *const PageTable = virt.as_ptr();
+        let table = unsafe { &*table_ptr };
+
+        entry = Some(table[index]);
+        match entry.unwrap().frame(level) {
+            Some(f) => match f {
+                Phys::Size2Mb(_) | Phys::Size1Gb(_) => {
+                    return (entry, level);
+                }
+                _ => frame = f,
+            },
+            None => return (None, level),
+        }
+    }
+
+    (entry, 0)
+}
 fn walk(table: Phys, addr: &VirtAddr) -> Option<Phys> {
     let physical_memory_offset = get_offset();
 
