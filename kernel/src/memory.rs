@@ -3,7 +3,7 @@ use x86_64::registers::control::Cr3;
 use x86_64::PhysAddr;
 
 use crate::paging::{PageTable, PageTableEntry, Phys};
-use crate::println;
+use crate::serial_println;
 use crate::virt_addr::VirtAddr;
 
 static PHYSICAL_OFFSET: Once<u64> = Once::new();
@@ -116,9 +116,18 @@ unsafe fn load_mut_table<'a>(frame: Phys) -> &'a mut PageTable {
 
 #[cfg(test)]
 mod tests {
-    use crate::{vga_buffer::VGA_BUFFER_ADDRESS, virt_addr::VirtAddr};
+    use x86_64::{
+        structures::paging::{PhysFrame, Size4KiB},
+        PhysAddr,
+    };
 
-    use super::{get_offset, translate_addr};
+    use crate::{
+        paging::{PageTableEntry, PageTableEntryFlags},
+        vga_buffer::VGA_BUFFER_ADDRESS,
+        virt_addr::VirtAddr,
+    };
+
+    use super::{create_mapping, get_offset, translate_addr};
 
     // We know the VGA buffer is identity mapped by the bootloader
     #[test_case]
@@ -132,7 +141,7 @@ mod tests {
         };
     }
 
-    // // We know that physical address 0 is mapped & uses huge pages (This could be flaky down the line)
+    // We know that physical address 0 is mapped & uses huge pages (This could be flaky down the line)
     #[test_case]
     fn translate_address_0() {
         // Physical Address 0 is at the map offset + 0
@@ -156,6 +165,52 @@ mod tests {
         };
     }
 
-    // Add entries to page table
-    // Add entry to page table (different types too) and see if we can read it back
+    // TODO: Use an address that doesn't rely on the TLB cache to prevent UB
+    #[test_case]
+    fn add_valid_entry() {
+        let addr = VirtAddr::new(5);
+        let frame = PhysFrame::<Size4KiB>::from_start_address(PhysAddr::new(4096)).unwrap();
+        let entry = PageTableEntry::new(frame, PageTableEntryFlags::PRESENT);
+
+        unsafe { create_mapping(&addr, entry) };
+
+        let phys_addr = translate_addr(&addr);
+
+        match phys_addr {
+            Some(pa) => assert_eq!(pa.as_u64(), 4101),
+            None => panic!("new page was not mapped to correct physical frame"),
+        }
+    }
+
+    #[test_case]
+    fn add_valid_huge_entry() {
+        let addr = get_offset();
+        let frame = PhysFrame::<Size4KiB>::from_start_address(PhysAddr::new(4096)).unwrap();
+        let entry = PageTableEntry::new(frame, PageTableEntryFlags::PRESENT);
+
+        unsafe { create_mapping(&addr, entry) };
+
+        let phys_addr = translate_addr(&addr);
+
+        match phys_addr {
+            Some(pa) => assert_eq!(pa.as_u64(), 0),
+            None => panic!("new page was not mapped to correct physical frame"),
+        }
+    }
+
+    #[test_case]
+    fn add_allocation_entry() {
+        let addr = VirtAddr::new(0xDEADBEEF);
+        let frame = PhysFrame::<Size4KiB>::from_start_address(PhysAddr::new(4096)).unwrap();
+        let entry = PageTableEntry::new(frame, PageTableEntryFlags::PRESENT);
+
+        unsafe { create_mapping(&addr, entry) };
+
+        let phys_addr = translate_addr(&addr);
+
+        match phys_addr {
+            Some(pa) => assert_eq!(pa.as_u64(), 4096),
+            None => panic!("new page was not mapped to correct physical frame"),
+        }
+    }
 }

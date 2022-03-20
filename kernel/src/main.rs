@@ -6,13 +6,7 @@
 
 use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
-use kernel::{
-    memory::{create_mapping, translate_addr},
-    paging::{PageTableEntry, PageTableEntryFlags},
-    println,
-    virt_addr::VirtAddr,
-};
-use x86_64::{structures::paging::PhysFrame, PhysAddr};
+use kernel::{memory::translate_addr, println, virt_addr::VirtAddr};
 
 entry_point!(kernel_main);
 
@@ -31,23 +25,8 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
                                                 // boot_info.physical_memory_offset, // Physical address 0
     ];
 
-    for &addr in &addresses {
+    for addr in addresses {
         let virt = VirtAddr::new(addr);
-        let phys = translate_addr(&virt);
-        println!("{:#x} -> {:?}", virt.as_u64(), phys);
-    }
-
-    let frame = PhysFrame::from_start_address(PhysAddr::new(4096));
-    let entry = PageTableEntry::new(
-        frame.unwrap(),
-        PageTableEntryFlags::PRESENT | PageTableEntryFlags::WRITABLE,
-    );
-    unsafe {
-        create_mapping(&VirtAddr::new(10), entry);
-    }
-
-    for &addr in &addresses {
-        let virt = VirtAddr::new(10);
         let phys = translate_addr(&virt);
         println!("{:#x} -> {:?}", virt.as_u64(), phys);
     }
