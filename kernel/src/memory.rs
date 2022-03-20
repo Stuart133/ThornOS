@@ -21,19 +21,27 @@ pub unsafe fn init(physical_memory_offset: u64) {
 pub fn translate_addr(addr: &VirtAddr) -> Option<PhysAddr> {
     let (level_4_table_frame, _) = Cr3::read();
 
-    let (entry, level) = walk(level_4_table_frame.into(), addr);
+    let mut frame: Phys = level_4_table_frame.into();
+    for i in 0..4 {
+        let level = 3 - i;
+        let index = addr.page_table_index(level);
 
-    println!("{:?}", entry);
-
-    match entry {
-        Some(pte) => match pte.frame(level) {
-            Some(f) => Some(f.start_address() + u64::from(addr.page_offset())),
-            None => None,
-        },
-        None => None,
+        // Convert the frame into a page table reference
+        let table = unsafe { load_table(frame) };
+        let entry = table[index];
+        match entry.frame(level) {
+            Some(f) => match f {
+                Phys::Size2Mb(_) | Phys::Size1Gb(_) => {
+                    frame = f;
+                    break;
+                }
+                _ => frame = f,
+            },
+            None => return None,
+        }
     }
 
-    // frame.map(|f| f.start_address() + u64::from(addr.page_offset()))
+    Some(frame.start_address() + u64::from(addr.page_offset()))
 }
 
 /// Create a new page table mapping
@@ -48,19 +56,14 @@ fn create_mapping_inner(addr: &VirtAddr, entry: PageTableEntry) {
     let (level_4_table_frame, _) = Cr3::read();
     let mut frame: Phys = level_4_table_frame.into();
 
-    let physical_memory_offset = get_offset();
+    let mut table = unsafe { load_mut_table(frame) };
 
-    let mut table: Option<&mut PageTable> = None;
     for i in 0..4 {
         let level = 3 - i;
         let index = addr.page_table_index(level);
+        table = unsafe { load_mut_table(frame) };
 
-        // Convert the frame into a page table reference
-        let virt = physical_memory_offset + frame.start_address().as_u64();
-        let table_ptr: *mut PageTable = virt.as_mut_ptr();
-        table = Some(unsafe { &mut *table_ptr });
-
-        let entry = table.as_ref().unwrap()[index];
+        let entry = table[index];
         match entry.frame(level) {
             Some(f) => match f {
                 Phys::Size2Mb(_) | Phys::Size1Gb(_) => {
@@ -68,53 +71,47 @@ fn create_mapping_inner(addr: &VirtAddr, entry: PageTableEntry) {
                 }
                 _ => frame = f,
             },
-            None => break,
-        }
-    }
-
-    match table {
-        Some(t) => {
-            t[addr.page_table_index(0)] = entry;
-        },
-        None => panic!("allocation of new page tables not yet supported"),
-    }
-}
-
-fn walk(table: Phys, addr: &VirtAddr) -> (Option<PageTableEntry>, usize) {
-    let physical_memory_offset = get_offset();
-
-    let mut frame: Phys = table;
-
-    let mut entry: Option<PageTableEntry> = None;
-    for i in 0..4 {
-        let level = 3 - i;
-        let index = addr.page_table_index(level);
-
-        // Convert the frame into a page table reference
-        let virt = physical_memory_offset + frame.start_address().as_u64();
-        let table_ptr: *const PageTable = virt.as_ptr();
-        let table = unsafe { &*table_ptr };
-
-        entry = Some(table[index]);
-        match entry.unwrap().frame(level) {
-            Some(f) => match f {
-                Phys::Size2Mb(_) | Phys::Size1Gb(_) => {
-                    return (entry, level);
+            None => {
+                if level != 0 {
+                    panic!("allocation of new page table frames not yet supported");
                 }
-                _ => frame = f,
-            },
-            None => return (None, level),
+            }
         }
     }
 
-    (entry, 0)
+    table[addr.page_table_index(0)] = entry;
 }
 
+#[inline]
 fn get_offset() -> VirtAddr {
     match PHYSICAL_OFFSET.wait() {
         Some(offset) => VirtAddr::new(*offset),
         None => panic!("virtual memory system is not initialized"),
     }
+}
+
+/// Load a page table from a physical frame address
+///
+/// This is unsafe because it transmutes the start address of the frame into a page table
+/// If it doesn't actually point to a page table memory corruption could occur
+#[inline]
+unsafe fn load_table<'a>(frame: Phys) -> &'a PageTable {
+    let virt = get_offset() + frame.start_address().as_u64();
+    let table_ptr: *const PageTable = virt.as_ptr();
+
+    &*table_ptr
+}
+
+/// Load a mutable page table from a physical frame address
+///
+/// This is unsafe because it transmutes the start address of the frame into a page table
+/// If it doesn't actually point to a page table memory corruption could occur
+#[inline]
+unsafe fn load_mut_table<'a>(frame: Phys) -> &'a mut PageTable {
+    let virt = get_offset() + frame.start_address().as_u64();
+    let table_ptr: *mut PageTable = virt.as_mut_ptr();
+
+    &mut *table_ptr
 }
 
 #[cfg(test)]

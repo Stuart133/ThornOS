@@ -112,7 +112,7 @@ impl From<PageTableIndex> for u16 {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Phys {
     Size4Kb(PhysFrame<Size4KiB>),
     Size2Mb(PhysFrame<Size2MiB>),
@@ -139,8 +139,8 @@ bitflags! {
 pub struct PageTableEntry(u64);
 
 impl PageTableEntry {
-    pub fn new(flags: PageTableEntryFlags) -> PageTableEntry {
-        PageTableEntry(flags.bits)
+    pub fn new(frame: PhysFrame, flags: PageTableEntryFlags) -> PageTableEntry {
+        PageTableEntry(frame.start_address().as_u64() | flags.bits)
     }
 
     pub fn frame(self, level: usize) -> Option<Phys> {
