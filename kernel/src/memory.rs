@@ -144,7 +144,7 @@ mod tests {
     };
 
     use crate::{
-        alloc::ZeroAllocator,
+        alloc::{ZeroAllocator, ALLOCATOR},
         paging::{PageTableEntry, PageTableEntryFlags},
         vga_buffer::VGA_BUFFER_ADDRESS,
         virt_addr::VirtAddr,
@@ -228,12 +228,17 @@ mod tests {
         let frame = PhysFrame::<Size4KiB>::from_start_address(PhysAddr::new(4096)).unwrap();
         let entry = PageTableEntry::new(frame, PageTableEntryFlags::PRESENT);
 
-        unsafe { create_mapping(&addr, entry, &mut ZeroAllocator {}) };
+        let alloc = match ALLOCATOR.wait() {
+            Some(a) => a,
+            None => panic!("boot info allocator not initialized"),
+        };
+
+        unsafe { create_mapping(&addr, entry, &mut *alloc.lock()) };
 
         let phys_addr = translate_addr(&addr);
 
         match phys_addr {
-            Some(pa) => assert_eq!(pa.as_u64(), 4096),
+            Some(pa) => assert_eq!(pa.as_u64(), addr.page_offset().as_u64() + 4096),
             None => panic!("new page was not mapped to correct physical frame"),
         }
     }

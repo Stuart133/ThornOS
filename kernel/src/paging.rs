@@ -57,6 +57,11 @@ impl PageOffset {
     pub fn new_truncate(offset: u16) -> PageOffset {
         PageOffset(offset % 4096)
     }
+
+    #[inline]
+    pub fn as_u64(self) -> u64 {
+        self.0 as u64
+    }
 }
 
 impl From<PageOffset> for u16 {
