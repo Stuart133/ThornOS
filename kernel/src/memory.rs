@@ -1,9 +1,10 @@
 use spin::Once;
 use x86_64::registers::control::Cr3;
+use x86_64::structures::paging::PhysFrame;
 use x86_64::PhysAddr;
 
 use crate::alloc::{Allocator, ZeroAllocator};
-use crate::paging::{PageTable, PageTableEntry, Phys};
+use crate::paging::{PageTable, PageTableEntry, PageTableEntryFlags, Phys};
 use crate::println;
 use crate::virt_addr::VirtAddr;
 
@@ -50,11 +51,11 @@ pub fn translate_addr(addr: &VirtAddr) -> Option<PhysAddr> {
 /// This is unsafe because if we map to an existing frame
 /// we can create aliased mutable references
 pub unsafe fn create_mapping(addr: &VirtAddr, entry: PageTableEntry) {
-    create_mapping_inner(addr, entry, ZeroAllocator{});
+    create_mapping_inner(addr, entry, &mut ZeroAllocator {});
 }
 
 #[inline]
-fn create_mapping_inner<T: Allocator>(addr: &VirtAddr, entry: PageTableEntry, allocator: T) {
+fn create_mapping_inner<T: Allocator>(addr: &VirtAddr, entry: PageTableEntry, allocator: &mut T) {
     let (level_4_table_frame, _) = Cr3::read();
     let mut frame: Phys = level_4_table_frame.into();
 
@@ -64,6 +65,7 @@ fn create_mapping_inner<T: Allocator>(addr: &VirtAddr, entry: PageTableEntry, al
         let level = 3 - i;
         let index = addr.page_table_index(level);
         table = unsafe { load_mut_table(frame) };
+        println!("level: {}", level);
 
         let entry = table[index];
         match entry.frame(level) {
@@ -77,7 +79,22 @@ fn create_mapping_inner<T: Allocator>(addr: &VirtAddr, entry: PageTableEntry, al
             },
             None => {
                 if level != 0 {
-                    panic!("allocation of new page table frames not yet supported");
+                    let new_frame = allocator.allocate();
+                    match new_frame {
+                        Some(f) => {
+                            // TODO: Ensure memory is cleared
+                            println!("alloc");
+                            let entry = PageTableEntry::new(
+                                f,
+                                PageTableEntryFlags::PRESENT | PageTableEntryFlags::WRITABLE,
+                            );
+                            table[index] = entry;
+                        }
+                        None => panic!(
+                            "allocation of new frame for page table level {} failed",
+                            level
+                        ),
+                    }
                 }
             }
         }
@@ -203,19 +220,19 @@ mod tests {
         }
     }
 
-    // #[test_case]
-    // fn add_allocation_entry() {
-    //     let addr = VirtAddr::new(0xDEADBEEF);
-    //     let frame = PhysFrame::<Size4KiB>::from_start_address(PhysAddr::new(4096)).unwrap();
-    //     let entry = PageTableEntry::new(frame, PageTableEntryFlags::PRESENT);
+    #[test_case]
+    fn add_allocation_entry() {
+        let addr = VirtAddr::new(0xDEADBEEF);
+        let frame = PhysFrame::<Size4KiB>::from_start_address(PhysAddr::new(4096)).unwrap();
+        let entry = PageTableEntry::new(frame, PageTableEntryFlags::PRESENT);
 
-    //     unsafe { create_mapping(&addr, entry) };
+        unsafe { create_mapping(&addr, entry) };
 
-    //     let phys_addr = translate_addr(&addr);
+        let phys_addr = translate_addr(&addr);
 
-    //     match phys_addr {
-    //         Some(pa) => assert_eq!(pa.as_u64(), 4096),
-    //         None => panic!("new page was not mapped to correct physical frame"),
-    //     }
-    // }
+        match phys_addr {
+            Some(pa) => assert_eq!(pa.as_u64(), 4096),
+            None => panic!("new page was not mapped to correct physical frame"),
+        }
+    }
 }

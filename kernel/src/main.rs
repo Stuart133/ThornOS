@@ -5,9 +5,18 @@
 #![reexport_test_harness_main = "test_main"]
 
 use bootloader::{entry_point, BootInfo};
-use x86_64::{PhysAddr, structures::paging::PhysFrame};
 use core::panic::PanicInfo;
-use kernel::{memory::{translate_addr, create_mapping}, println, virt_addr::VirtAddr, paging::{PageTableEntry, PageTableEntryFlags}, vga_buffer::VGA_BUFFER_ADDRESS};
+use kernel::{
+    memory::{create_mapping, translate_addr},
+    paging::{PageTableEntry, PageTableEntryFlags},
+    println,
+    vga_buffer::VGA_BUFFER_ADDRESS,
+    virt_addr::VirtAddr,
+};
+use x86_64::{
+    structures::paging::{PhysFrame, Size4KiB},
+    PhysAddr,
+};
 
 entry_point!(kernel_main);
 
@@ -20,12 +29,27 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     test_main();
 
     let zero_addr = VirtAddr::new(0);
-    let entry = PageTableEntry::new(PhysFrame::from_start_address(PhysAddr::new(VGA_BUFFER_ADDRESS)).unwrap(), PageTableEntryFlags::PRESENT | PageTableEntryFlags::WRITABLE);
+    let frame =
+        PhysFrame::<Size4KiB>::from_start_address(PhysAddr::new(VGA_BUFFER_ADDRESS)).unwrap();
+    let entry = PageTableEntry::new(
+        frame,
+        PageTableEntryFlags::PRESENT | PageTableEntryFlags::WRITABLE,
+    );
+    unsafe { create_mapping(&zero_addr, entry) };
+
+    let zero_addr = VirtAddr::new(0xDEADBEEF);
+    let frame =
+        PhysFrame::<Size4KiB>::from_start_address(PhysAddr::new(VGA_BUFFER_ADDRESS)).unwrap();
+    let entry = PageTableEntry::new(
+        frame,
+        PageTableEntryFlags::PRESENT | PageTableEntryFlags::WRITABLE,
+    );
     unsafe { create_mapping(&zero_addr, entry) };
 
     let addresses = [
         VGA_BUFFER_ADDRESS, // vga buffer
         0,
+        0xDEADBEEF,
     ];
 
     for addr in addresses {
@@ -33,9 +57,6 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
         let phys = translate_addr(&virt);
         println!("{:#x} -> {:?}", virt.as_u64(), phys);
     }
-
-    let ptr: *mut u64 = zero_addr.as_mut_ptr();
-    unsafe { ptr.offset(400).write_volatile(0x_f021_f077_f065_f04e)};
 
     kernel::hlt_loop();
 }

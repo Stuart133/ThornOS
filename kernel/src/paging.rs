@@ -2,7 +2,7 @@ use core::ops::{Index, IndexMut};
 
 use bitflags::bitflags;
 use x86_64::{
-    structures::paging::{PhysFrame, Size1GiB, Size2MiB, Size4KiB},
+    structures::paging::{PageSize, PhysFrame, Size1GiB, Size2MiB, Size4KiB},
     PhysAddr,
 };
 
@@ -10,6 +10,7 @@ const PAGE_TABLE_SIZE: usize = 512;
 
 #[repr(align(4096))]
 #[repr(C)]
+#[derive(Debug)]
 pub struct PageTable {
     entries: [PageTableEntry; PAGE_TABLE_SIZE],
 }
@@ -139,7 +140,7 @@ bitflags! {
 pub struct PageTableEntry(u64);
 
 impl PageTableEntry {
-    pub fn new(frame: PhysFrame, flags: PageTableEntryFlags) -> PageTableEntry {
+    pub fn new<S: PageSize>(frame: PhysFrame<S>, flags: PageTableEntryFlags) -> PageTableEntry {
         PageTableEntry(frame.start_address().as_u64() | flags.bits)
     }
 
