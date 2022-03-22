@@ -67,7 +67,9 @@ fn create_mapping_inner(addr: &VirtAddr, entry: PageTableEntry) {
         match entry.frame(level) {
             Some(f) => match f {
                 Phys::Size2Mb(_) | Phys::Size1Gb(_) => {
-                    break;
+                    // Set the table entry here so we can index the correct virtual address PTE level
+                    table[addr.page_table_index(level)] = entry;
+                    return;
                 }
                 _ => frame = f,
             },
@@ -182,10 +184,12 @@ mod tests {
         }
     }
 
+    // The physical memory is mapped into huge pages - Remap Offset -> 0 to ensure huge pages
+    // can be mapped into correctly
     #[test_case]
     fn add_valid_huge_entry() {
         let addr = get_offset();
-        let frame = PhysFrame::<Size4KiB>::from_start_address(PhysAddr::new(4096)).unwrap();
+        let frame = PhysFrame::<Size4KiB>::from_start_address(PhysAddr::new(0)).unwrap();
         let entry = PageTableEntry::new(frame, PageTableEntryFlags::PRESENT);
 
         unsafe { create_mapping(&addr, entry) };
