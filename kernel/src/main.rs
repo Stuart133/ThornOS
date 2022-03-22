@@ -7,7 +7,7 @@
 use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
 use kernel::{
-    alloc::ALLOCATOR,
+    allocator::ALLOCATOR,
     memory::{create_mapping, translate_addr},
     paging::{PageTableEntry, PageTableEntryFlags},
     println,

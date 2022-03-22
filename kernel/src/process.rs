@@ -17,6 +17,17 @@ struct Process {
     pagetable: PageTable,
 }
 
+impl Process {
+    fn new() -> Self {
+        Process {
+            state: State::Available,
+            exit_code: 0,
+            process_id: 0,
+            pagetable: PageTable::new(),
+        }
+    }
+}
+
 #[allow(dead_code)]
 enum State {
     Available,
@@ -32,17 +43,7 @@ fn init_process() {}
 #[allow(unreachable_code)]
 fn init_process_list() -> [Mutex<Process>; NPROC] {
     [
-        Mutex::new(Process {
-            state: State::Available,
-            exit_code: 0,
-            process_id: 0,
-            pagetable: todo!(),
-        }),
-        Mutex::new(Process {
-            state: State::Available,
-            exit_code: 0,
-            process_id: 0,
-            pagetable: todo!(),
-        }),
+        Mutex::new(Process::new()),
+        Mutex::new(Process::new()),
     ]
 }

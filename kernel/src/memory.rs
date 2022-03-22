@@ -2,7 +2,7 @@ use spin::Once;
 use x86_64::registers::control::Cr3;
 use x86_64::PhysAddr;
 
-use crate::alloc::Allocator;
+use crate::allocator::Allocator;
 use crate::paging::{PageTable, PageTableEntry, PageTableEntryFlags, Phys};
 use crate::virt_addr::VirtAddr;
 
@@ -145,7 +145,7 @@ mod tests {
     };
 
     use crate::{
-        alloc::{ZeroAllocator, ALLOCATOR},
+        allocator::{ZeroAllocator, ALLOCATOR},
         paging::{PageTableEntry, PageTableEntryFlags},
         vga_buffer::VGA_BUFFER_ADDRESS,
         virt_addr::VirtAddr,

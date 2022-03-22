@@ -8,7 +8,7 @@
 use bootloader::BootInfo;
 use core::panic::PanicInfo;
 
-pub mod alloc;
+pub mod allocator;
 pub mod gdt;
 pub mod interrupts;
 pub mod memory;
@@ -22,7 +22,7 @@ pub fn init(boot_info: &'static BootInfo) {
     gdt::init();
     interrupts::init_idt();
     interrupts::init_pics();
-    unsafe { alloc::init(&boot_info.memory_map) }; // We're getting the memory map from the boot info so this is safe
+    unsafe { allocator::init(&boot_info.memory_map) }; // We're getting the memory map from the boot info so this is safe
     unsafe { memory::init(boot_info.physical_memory_offset) }; // We're getting the offset from the boot info so this is safe
     x86_64::instructions::interrupts::enable();
 }

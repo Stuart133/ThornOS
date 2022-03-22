@@ -15,6 +15,14 @@ pub struct PageTable {
     entries: [PageTableEntry; PAGE_TABLE_SIZE],
 }
 
+impl PageTable {
+    pub fn new() -> Self {
+        PageTable {
+            entries: [PageTableEntry::new_zero(); PAGE_TABLE_SIZE],
+        }
+    }
+}
+
 impl Index<usize> for PageTable {
     type Output = PageTableEntry;
 
@@ -139,8 +147,12 @@ bitflags! {
 pub struct PageTableEntry(u64);
 
 impl PageTableEntry {
-    pub fn new<S: PageSize>(frame: PhysFrame<S>, flags: PageTableEntryFlags) -> PageTableEntry {
+    pub fn new<S: PageSize>(frame: PhysFrame<S>, flags: PageTableEntryFlags) -> Self {
         PageTableEntry(frame.start_address().as_u64() | flags.bits)
+    }
+
+    fn new_zero() -> Self {
+        PageTableEntry(0)
     }
 
     pub fn frame(self, level: usize) -> Option<Phys> {
@@ -204,7 +216,7 @@ impl From<PhysFrame> for Phys {
 #[cfg(test)]
 mod tests {
     use x86_64::{
-        structures::paging::{PhysFrame, Size4KiB, Size2MiB},
+        structures::paging::{PhysFrame, Size2MiB, Size4KiB},
         PhysAddr,
     };
 
