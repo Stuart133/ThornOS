@@ -203,7 +203,59 @@ impl From<PhysFrame> for Phys {
 
 #[cfg(test)]
 mod tests {
-    use super::{PageOffset, PageTableIndex};
+    use x86_64::{
+        structures::paging::{PhysFrame, Size4KiB, Size2MiB},
+        PhysAddr,
+    };
+
+    use super::{PageOffset, PageTableEntry, PageTableEntryFlags, PageTableIndex};
+
+    #[test_case]
+    fn unmapped_page_returns_none() {
+        let pte = PageTableEntry::new(
+            PhysFrame::<Size4KiB>::containing_address(PhysAddr::new(0)),
+            PageTableEntryFlags { bits: 0 },
+        );
+
+        let frame = pte.frame(0);
+        match frame {
+            Some(_) => panic!("unmapped frame was returned"),
+            None => {}
+        };
+    }
+
+    #[test_case]
+    fn mapped_page_returns_frame() {
+        let pte = PageTableEntry::new(
+            PhysFrame::<Size4KiB>::containing_address(PhysAddr::new(4096)),
+            PageTableEntryFlags::PRESENT,
+        );
+
+        let frame = pte.frame(0);
+        match frame {
+            Some(f) => {
+                assert_eq!(f.start_address().as_u64(), 4096)
+            }
+            None => panic!("frame was not returned"),
+        };
+    }
+
+    // TODO: Test huge page panics when panicking tests are supported
+    #[test_case]
+    fn mapped_hugepage_returns_frame() {
+        let pte = PageTableEntry::new(
+            PhysFrame::<Size2MiB>::containing_address(PhysAddr::new(8000)),
+            PageTableEntryFlags::PRESENT | PageTableEntryFlags::HUGE_PAGE,
+        );
+
+        let frame = pte.frame(1);
+        match frame {
+            Some(f) => {
+                assert_eq!(f.start_address().as_u64(), 0)
+            }
+            None => panic!("frame was not returned"),
+        };
+    }
 
     #[test_case]
     fn page_table_index_truncate() {

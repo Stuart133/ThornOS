@@ -44,7 +44,8 @@ pub fn translate_addr(addr: &VirtAddr) -> Option<PhysAddr> {
     Some(frame.start_address() + u64::from(addr.page_offset()))
 }
 
-/// Create a new page table mapping
+/// Create a new page table mapping using allocator to allocate new page table frames
+/// as required
 ///
 /// This is unsafe because if we map to an existing frame
 /// we can create aliased mutable references

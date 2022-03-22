@@ -1,6 +1,8 @@
 use lazy_static::lazy_static;
 use spin::Mutex;
 
+use crate::paging::PageTable;
+
 const NPROC: usize = 2;
 
 lazy_static! {
@@ -12,6 +14,7 @@ struct Process {
     state: State,
     exit_code: i32,
     process_id: i32,
+    pagetable: PageTable,
 }
 
 #[allow(dead_code)]
@@ -26,17 +29,20 @@ enum State {
 #[allow(dead_code)]
 fn init_process() {}
 
+#[allow(unreachable_code)]
 fn init_process_list() -> [Mutex<Process>; NPROC] {
     [
         Mutex::new(Process {
             state: State::Available,
             exit_code: 0,
             process_id: 0,
+            pagetable: todo!(),
         }),
         Mutex::new(Process {
             state: State::Available,
             exit_code: 0,
             process_id: 0,
+            pagetable: todo!(),
         }),
     ]
 }

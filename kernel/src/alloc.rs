@@ -1,5 +1,5 @@
 use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
-use spin::{Once, Mutex};
+use spin::{Mutex, Once};
 use x86_64::{
     structures::paging::{PageSize, PhysFrame, Size4KiB},
     PhysAddr,
@@ -7,10 +7,12 @@ use x86_64::{
 
 pub static ALLOCATOR: Once<Mutex<BootInfoAllocator>> = Once::new();
 
+/// Initialize the boot info allocate
+///
+/// This is unsafe because the caller must guarantee that the passed
+/// memory map is valid. All froms marked as USABLE must actually be unused
 pub unsafe fn init(memory_map: &'static MemoryMap) {
-    ALLOCATOR.call_once(|| {
-        Mutex::<BootInfoAllocator>::new(BootInfoAllocator::init(memory_map))
-    });
+    ALLOCATOR.call_once(|| Mutex::<BootInfoAllocator>::new(BootInfoAllocator::init(memory_map)));
 }
 
 pub trait Allocator<S: PageSize = Size4KiB> {
@@ -45,7 +47,7 @@ impl BootInfoAllocator {
     ///
     /// This is unsafe because the caller must guarantee that the passed
     /// memory map is valid. All froms marked as USABLE must actually be unused
-    pub unsafe fn init(memory_map: &'static MemoryMap) -> Self {
+    unsafe fn init(memory_map: &'static MemoryMap) -> Self {
         BootInfoAllocator {
             memory_map,
             next: 0,
