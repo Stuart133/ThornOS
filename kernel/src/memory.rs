@@ -52,6 +52,7 @@ pub unsafe fn create_mapping(addr: &VirtAddr, entry: PageTableEntry) {
     create_mapping_inner(addr, entry);
 }
 
+#[inline]
 fn create_mapping_inner(addr: &VirtAddr, entry: PageTableEntry) {
     let (level_4_table_frame, _) = Cr3::read();
     let mut frame: Phys = level_4_table_frame.into();

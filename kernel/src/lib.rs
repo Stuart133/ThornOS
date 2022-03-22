@@ -8,6 +8,7 @@
 use bootloader::BootInfo;
 use core::panic::PanicInfo;
 
+pub mod alloc;
 pub mod gdt;
 pub mod interrupts;
 pub mod memory;
