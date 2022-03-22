@@ -18,10 +18,11 @@ pub mod serial;
 pub mod vga_buffer;
 pub mod virt_addr;
 
-pub fn init(boot_info: &BootInfo) {
+pub fn init(boot_info: &'static BootInfo) {
     gdt::init();
     interrupts::init_idt();
     interrupts::init_pics();
+    unsafe { alloc::init(&boot_info.memory_map) }; // We're getting the memory map from the boot info so this is safe
     unsafe { memory::init(boot_info.physical_memory_offset) }; // We're getting the offset from the boot info so this is safe
     x86_64::instructions::interrupts::enable();
 }

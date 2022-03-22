@@ -15,12 +15,6 @@ pub struct PageTable {
     entries: [PageTableEntry; PAGE_TABLE_SIZE],
 }
 
-impl PageTable {
-    pub fn add_entry(mut self, pte: PageTableEntry, index: PageTableIndex) {
-        self.entries[usize::from(index)] = pte
-    }
-}
-
 impl Index<usize> for PageTable {
     type Output = PageTableEntry;
 

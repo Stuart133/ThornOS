@@ -1,8 +1,17 @@
 use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
+use spin::{Once, Mutex};
 use x86_64::{
     structures::paging::{PageSize, PhysFrame, Size4KiB},
     PhysAddr,
 };
+
+pub static ALLOCATOR: Once<Mutex<BootInfoAllocator>> = Once::new();
+
+pub unsafe fn init(memory_map: &'static MemoryMap) {
+    ALLOCATOR.call_once(|| {
+        Mutex::<BootInfoAllocator>::new(BootInfoAllocator::init(memory_map))
+    });
+}
 
 pub trait Allocator<S: PageSize = Size4KiB> {
     fn allocate(&mut self) -> Option<PhysFrame<S>>;

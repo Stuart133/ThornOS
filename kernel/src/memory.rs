@@ -1,11 +1,9 @@
 use spin::Once;
 use x86_64::registers::control::Cr3;
-use x86_64::structures::paging::PhysFrame;
 use x86_64::PhysAddr;
 
-use crate::alloc::{Allocator, ZeroAllocator};
+use crate::alloc::Allocator;
 use crate::paging::{PageTable, PageTableEntry, PageTableEntryFlags, Phys};
-use crate::println;
 use crate::virt_addr::VirtAddr;
 
 static PHYSICAL_OFFSET: Once<u64> = Once::new();
@@ -50,8 +48,12 @@ pub fn translate_addr(addr: &VirtAddr) -> Option<PhysAddr> {
 ///
 /// This is unsafe because if we map to an existing frame
 /// we can create aliased mutable references
-pub unsafe fn create_mapping(addr: &VirtAddr, entry: PageTableEntry) {
-    create_mapping_inner(addr, entry, &mut ZeroAllocator {});
+pub unsafe fn create_mapping<T: Allocator>(
+    addr: &VirtAddr,
+    entry: PageTableEntry,
+    allocator: &mut T,
+) {
+    create_mapping_inner(addr, entry, allocator);
 }
 
 #[inline]
@@ -65,7 +67,6 @@ fn create_mapping_inner<T: Allocator>(addr: &VirtAddr, entry: PageTableEntry, al
         let level = 3 - i;
         let index = addr.page_table_index(level);
         table = unsafe { load_mut_table(frame) };
-        println!("level: {}", level);
 
         let entry = table[index];
         match entry.frame(level) {
@@ -83,12 +84,12 @@ fn create_mapping_inner<T: Allocator>(addr: &VirtAddr, entry: PageTableEntry, al
                     match new_frame {
                         Some(f) => {
                             // TODO: Ensure memory is cleared
-                            println!("alloc");
                             let entry = PageTableEntry::new(
                                 f,
                                 PageTableEntryFlags::PRESENT | PageTableEntryFlags::WRITABLE,
                             );
                             table[index] = entry;
+                            frame = Phys::Size4Kb(f);
                         }
                         None => panic!(
                             "allocation of new frame for page table level {} failed",
@@ -143,6 +144,7 @@ mod tests {
     };
 
     use crate::{
+        alloc::ZeroAllocator,
         paging::{PageTableEntry, PageTableEntryFlags},
         vga_buffer::VGA_BUFFER_ADDRESS,
         virt_addr::VirtAddr,
@@ -192,7 +194,7 @@ mod tests {
         let frame = PhysFrame::<Size4KiB>::from_start_address(PhysAddr::new(4096)).unwrap();
         let entry = PageTableEntry::new(frame, PageTableEntryFlags::PRESENT);
 
-        unsafe { create_mapping(&addr, entry) };
+        unsafe { create_mapping(&addr, entry, &mut ZeroAllocator {}) };
 
         let phys_addr = translate_addr(&addr);
 
@@ -210,7 +212,7 @@ mod tests {
         let frame = PhysFrame::<Size4KiB>::from_start_address(PhysAddr::new(0)).unwrap();
         let entry = PageTableEntry::new(frame, PageTableEntryFlags::PRESENT);
 
-        unsafe { create_mapping(&addr, entry) };
+        unsafe { create_mapping(&addr, entry, &mut ZeroAllocator {}) };
 
         let phys_addr = translate_addr(&addr);
 
@@ -226,7 +228,7 @@ mod tests {
         let frame = PhysFrame::<Size4KiB>::from_start_address(PhysAddr::new(4096)).unwrap();
         let entry = PageTableEntry::new(frame, PageTableEntryFlags::PRESENT);
 
-        unsafe { create_mapping(&addr, entry) };
+        unsafe { create_mapping(&addr, entry, &mut ZeroAllocator {}) };
 
         let phys_addr = translate_addr(&addr);
 
