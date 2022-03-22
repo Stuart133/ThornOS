@@ -21,7 +21,10 @@ Some general TODOs for now
 
 - Pre commit hook
 - CI hookup
-- Improve test framework (panic tests)
+- Improve test framework
+  - Panic tests
+  - Skip tests
+  - Better output formatting
 - Design syscall interface
 - ELF loader
 - Shell

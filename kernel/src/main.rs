@@ -5,8 +5,9 @@
 #![reexport_test_harness_main = "test_main"]
 
 use bootloader::{entry_point, BootInfo};
+use x86_64::{PhysAddr, structures::paging::PhysFrame};
 use core::panic::PanicInfo;
-use kernel::{memory::translate_addr, println, virt_addr::VirtAddr};
+use kernel::{memory::{translate_addr, create_mapping}, println, virt_addr::VirtAddr, paging::{PageTableEntry, PageTableEntryFlags}, vga_buffer::VGA_BUFFER_ADDRESS};
 
 entry_point!(kernel_main);
 
@@ -18,11 +19,13 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     #[cfg(test)]
     test_main();
 
+    let zero_addr = VirtAddr::new(0);
+    let entry = PageTableEntry::new(PhysFrame::from_start_address(PhysAddr::new(VGA_BUFFER_ADDRESS)).unwrap(), PageTableEntryFlags::PRESENT | PageTableEntryFlags::WRITABLE);
+    unsafe { create_mapping(&zero_addr, entry) };
+
     let addresses = [
-        kernel::vga_buffer::VGA_BUFFER_ADDRESS, // vga buffer
-                                                // 0x201008,
-                                                // 0x0100_0020_1a10,
-                                                // boot_info.physical_memory_offset, // Physical address 0
+        VGA_BUFFER_ADDRESS, // vga buffer
+        0,
     ];
 
     for addr in addresses {
@@ -30,6 +33,9 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
         let phys = translate_addr(&virt);
         println!("{:#x} -> {:?}", virt.as_u64(), phys);
     }
+
+    let ptr: *mut u64 = zero_addr.as_mut_ptr();
+    unsafe { ptr.offset(400).write_volatile(0x_f021_f077_f065_f04e)};
 
     kernel::hlt_loop();
 }
