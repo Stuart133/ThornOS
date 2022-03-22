@@ -1,3 +1,5 @@
+use core::{alloc::GlobalAlloc, ptr::null_mut};
+
 use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
 use spin::{Mutex, Once};
 use x86_64::{
@@ -5,24 +7,27 @@ use x86_64::{
     PhysAddr,
 };
 
-pub static ALLOCATOR: Once<Mutex<BootInfoAllocator>> = Once::new();
+pub static FRAME_ALLOCATOR: Once<Mutex<BootInfoAllocator>> = Once::new();
 
-/// Initialize the boot info allocate
+#[global_allocator]
+static GLOBAL_ALLOCATOR: Dummy = Dummy;
+
+/// Initialize the boot info allocator
 ///
 /// This is unsafe because the caller must guarantee that the passed
 /// memory map is valid. All froms marked as USABLE must actually be unused
 pub unsafe fn init(memory_map: &'static MemoryMap) {
-    ALLOCATOR.call_once(|| Mutex::<BootInfoAllocator>::new(BootInfoAllocator::init(memory_map)));
+    FRAME_ALLOCATOR.call_once(|| Mutex::<BootInfoAllocator>::new(BootInfoAllocator::init(memory_map)));
 }
 
-pub trait Allocator<S: PageSize = Size4KiB> {
+pub trait FrameAllocator<S: PageSize = Size4KiB> {
     fn allocate(&mut self) -> Option<PhysFrame<S>>;
 }
 
 /// An allocator that always returns None
-pub struct ZeroAllocator {}
+pub struct ZeroAllocator;
 
-impl Allocator for ZeroAllocator {
+impl FrameAllocator for ZeroAllocator {
     fn allocate(&mut self) -> Option<PhysFrame> {
         None
     }
@@ -34,7 +39,7 @@ pub struct BootInfoAllocator {
     next: usize,
 }
 
-impl Allocator for BootInfoAllocator {
+impl FrameAllocator for BootInfoAllocator {
     fn allocate(&mut self) -> Option<PhysFrame> {
         let frame = self.usable_frames().nth(self.next);
         self.next += 1;
@@ -62,5 +67,17 @@ impl BootInfoAllocator {
         let frame_addresses = addr_ranges.flat_map(|r| r.step_by(4096));
 
         frame_addresses.map(|addr| PhysFrame::containing_address(PhysAddr::new(addr)))
+    }
+}
+
+pub struct Dummy;
+
+unsafe impl GlobalAlloc for Dummy {
+    unsafe fn alloc(&self, _layout: core::alloc::Layout) -> *mut u8 {
+        null_mut()
+    }
+
+    unsafe fn dealloc(&self, _ptr: *mut u8, _layout: core::alloc::Layout) {
+        panic!("dealloc should never be called")
     }
 }

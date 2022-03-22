@@ -2,7 +2,7 @@ use spin::Once;
 use x86_64::registers::control::Cr3;
 use x86_64::PhysAddr;
 
-use crate::allocator::Allocator;
+use crate::allocator::FrameAllocator;
 use crate::paging::{PageTable, PageTableEntry, PageTableEntryFlags, Phys};
 use crate::virt_addr::VirtAddr;
 
@@ -49,7 +49,7 @@ pub fn translate_addr(addr: &VirtAddr) -> Option<PhysAddr> {
 ///
 /// This is unsafe because if we map to an existing frame
 /// we can create aliased mutable references
-pub unsafe fn create_mapping<T: Allocator>(
+pub unsafe fn create_mapping<T: FrameAllocator>(
     addr: &VirtAddr,
     entry: PageTableEntry,
     allocator: &mut T,
@@ -58,7 +58,7 @@ pub unsafe fn create_mapping<T: Allocator>(
 }
 
 #[inline]
-fn create_mapping_inner<T: Allocator>(addr: &VirtAddr, entry: PageTableEntry, allocator: &mut T) {
+fn create_mapping_inner<T: FrameAllocator>(addr: &VirtAddr, entry: PageTableEntry, allocator: &mut T) {
     let (level_4_table_frame, _) = Cr3::read();
     let mut frame: Phys = level_4_table_frame.into();
 
@@ -145,7 +145,7 @@ mod tests {
     };
 
     use crate::{
-        allocator::{ZeroAllocator, ALLOCATOR},
+        allocator::{ZeroAllocator, FRAME_ALLOCATOR},
         paging::{PageTableEntry, PageTableEntryFlags},
         vga_buffer::VGA_BUFFER_ADDRESS,
         virt_addr::VirtAddr,
@@ -229,7 +229,7 @@ mod tests {
         let frame = PhysFrame::<Size4KiB>::from_start_address(PhysAddr::new(4096)).unwrap();
         let entry = PageTableEntry::new(frame, PageTableEntryFlags::PRESENT);
 
-        let alloc = match ALLOCATOR.wait() {
+        let alloc = match FRAME_ALLOCATOR.wait() {
             Some(a) => a,
             None => panic!("boot info allocator not initialized"),
         };

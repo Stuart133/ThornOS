@@ -4,10 +4,13 @@
 #![test_runner(kernel::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
+extern crate alloc;
+
+use alloc::boxed::Box;
 use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
 use kernel::{
-    allocator::ALLOCATOR,
+    allocator::FRAME_ALLOCATOR,
     memory::{create_mapping, translate_addr},
     paging::{PageTableEntry, PageTableEntryFlags},
     println,
@@ -25,13 +28,15 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     println!("Hello world{}", "!");
 
     kernel::init(boot_info);
-    let alloc = match ALLOCATOR.wait() {
+    let alloc = match FRAME_ALLOCATOR.wait() {
         Some(a) => a,
         None => panic!("boot info allocator not initialized"),
     };
 
     #[cfg(test)]
     test_main();
+
+    let x = Box::new(42);
 
     let zero_addr = VirtAddr::new(0xDEADBEEF);
     let frame =
