@@ -219,12 +219,16 @@ impl Page {
     pub fn as_virt_addr(self) -> VirtAddr {
         self.0
     }
+
+    #[inline]
+    pub fn as_u64(self) -> u64 {
+        self.0.as_u64()
+    }
 }
 
 impl Add<u64> for Page {
     type Output = Page;
 
-    // TODO: Test this
     #[inline]
     fn add(self, rhs: u64) -> Self::Output {
         Page::containing_address(self.0 + 4096 * rhs)
@@ -248,7 +252,6 @@ impl PageRangeInclusive {
 impl Iterator for PageRangeInclusive {
     type Item = Page;
 
-    // TODO: Test this
     fn next(&mut self) -> Option<Self::Item> {
         if self.start < self.end {
             let p = Some(self.start);
@@ -278,7 +281,53 @@ mod tests {
         PhysAddr,
     };
 
-    use super::{PageOffset, PageTableEntry, PageTableEntryFlags, PageTableIndex};
+    use crate::virt_addr::VirtAddr;
+
+    use super::{PageOffset, PageTableEntry, PageTableEntryFlags, PageTableIndex, Page, PageRangeInclusive};
+
+    #[test_case]
+    fn add_4kb_page() {
+        let addr = VirtAddr::new(4096);
+        let page = Page::containing_address(addr);
+
+        assert_eq!((page + 5).as_u64(), 24_576);
+    }
+
+    #[test_case]
+    fn iterate_inclusive_page_range() {
+        let start_page = Page::containing_address(VirtAddr::new(0));
+        let end_page = Page::containing_address(VirtAddr::new(20_000));
+        let page_range = PageRangeInclusive::new(start_page, end_page);
+
+        let mut c = 0;
+        for page in page_range {
+            assert_eq!(page.as_u64(), start_page.as_u64() + c * 4096);
+            c += 1;
+        }
+
+        assert_eq!(c, 4);
+    }
+
+    #[test_case]
+    fn iterate_reverse_inclusive_page_range() {
+        let start_page = Page::containing_address(VirtAddr::new(20_000));
+        let end_page = Page::containing_address(VirtAddr::new(0));
+        let page_range = PageRangeInclusive::new(start_page, end_page);
+
+        for _ in page_range {
+            panic!("empty range shouldn't produce any iteration");
+        }
+    }
+
+    #[test_case]
+    fn iterate_empty_inclusive_page_range() {
+        let page = Page::containing_address(VirtAddr::new(0));
+        let page_range = PageRangeInclusive::new(page, page);
+
+        for _ in page_range {
+            panic!("empty range shouldn't produce any iteration");
+        }
+    }
 
     #[test_case]
     fn unmapped_page_returns_none() {
