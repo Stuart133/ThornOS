@@ -283,7 +283,9 @@ mod tests {
 
     use crate::virt_addr::VirtAddr;
 
-    use super::{PageOffset, PageTableEntry, PageTableEntryFlags, PageTableIndex, Page, PageRangeInclusive};
+    use super::{
+        Page, PageOffset, PageRangeInclusive, PageTableEntry, PageTableEntryFlags, PageTableIndex,
+    };
 
     #[test_case]
     fn add_4kb_page() {

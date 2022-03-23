@@ -20,7 +20,11 @@ fn main(boot_info: &'static BootInfo) -> ! {
         Some(a) => a,
         None => panic!("boot info allocator not initialized"),
     };
-    init_heap(&mut *alloc.lock());
+    let result = init_heap(&mut *alloc.lock());
+    match result {
+        Ok(_) => {}
+        Err(_) => panic!("init heap failed"),
+    }
 
     test_main();
     loop {}

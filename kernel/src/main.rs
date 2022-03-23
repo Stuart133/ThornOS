@@ -26,9 +26,13 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
     let alloc = match FRAME_ALLOCATOR.wait() {
         Some(a) => a,
-        None => panic!("boot info allocator not initialized"),
+        None => panic!("frame allocator not initialized"),
     };
-    init_heap(&mut *alloc.lock());
+    let result = init_heap(&mut *alloc.lock());
+    match result {
+        Ok(_) => {}
+        Err(_) => panic!("init heap failed"),
+    }
 
     let x = Box::new(42);
     println!("heap_value at {:p}", x);

@@ -7,7 +7,7 @@ use x86_64::{
 };
 
 use crate::{
-    memory::create_mapping,
+    memory::map_page,
     paging::{Page, PageRangeInclusive, PageTableEntry, PageTableEntryFlags},
     virt_addr::VirtAddr,
 };
@@ -21,7 +21,7 @@ pub const HEAP_START: usize = 0x4444_4444_0000;
 pub const HEAP_SIZE: usize = 100 * 1024;
 
 // TODO: Return a result here
-pub fn init_heap(frame_allocator: &mut impl FrameAllocator) {
+pub fn init_heap(frame_allocator: &mut impl FrameAllocator) -> Result<(), ()> {
     let page_range = {
         let heap_start = VirtAddr::new(HEAP_START.try_into().unwrap()); // TODO: Make this less gross
         let heap_end = heap_start + (HEAP_SIZE - 1).try_into().unwrap();
@@ -34,12 +34,18 @@ pub fn init_heap(frame_allocator: &mut impl FrameAllocator) {
         let frame = frame_allocator.allocate().unwrap();
         let flags = PageTableEntryFlags::PRESENT | PageTableEntryFlags::WRITABLE;
         let entry = PageTableEntry::new(frame, flags);
-        unsafe { create_mapping(page, entry, frame_allocator) }
+        let page_result = unsafe { map_page(page, entry, frame_allocator) };
+        match page_result {
+            Ok(_) => {}
+            Err(_) => return Err(()),
+        };
     }
 
     unsafe {
         GLOBAL_ALLOCATOR.lock().init(HEAP_START, HEAP_SIZE);
     }
+
+    Ok(())
 }
 
 /// Initialize the boot info allocator
