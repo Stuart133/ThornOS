@@ -8,8 +8,8 @@ use x86_64::{
 };
 
 use crate::{
-    paging::{Page, PageRangeInclusive},
-    virt_addr::VirtAddr,
+    paging::{Page, PageRangeInclusive, PageTableEntryFlags, PageTableEntry},
+    virt_addr::VirtAddr, memory::create_mapping,
 };
 
 pub static FRAME_ALLOCATOR: Once<Mutex<BootInfoAllocator>> = Once::new();
@@ -20,7 +20,8 @@ static GLOBAL_ALLOCATOR: Dummy = Dummy;
 pub const HEAP_START: u64 = 0x4444_4444_0000;
 pub const HEAP_SIZE: u64 = 100 * 1024;
 
-pub fn init_heap() {
+// TODO: Return a result here
+pub fn init_heap(frame_allocator: &mut impl FrameAllocator) {
     let page_range = {
         let heap_start = VirtAddr::new(HEAP_START);
         let heap_end = heap_start + (HEAP_SIZE - 1);
@@ -29,7 +30,14 @@ pub fn init_heap() {
         PageRangeInclusive::new(heap_start_page, heap_end_page)
     };
 
-    for page in page_range {}
+    for page in page_range {
+        let frame = frame_allocator.allocate().unwrap();
+        let flags = PageTableEntryFlags::PRESENT | PageTableEntryFlags::WRITABLE;
+        let entry = PageTableEntry::new(frame, flags);
+        unsafe {
+            create_mapping(page, entry, frame_allocator)
+        }
+    }
 }
 
 /// Initialize the boot info allocator

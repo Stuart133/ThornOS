@@ -3,7 +3,7 @@ use x86_64::registers::control::Cr3;
 use x86_64::PhysAddr;
 
 use crate::allocator::FrameAllocator;
-use crate::paging::{PageTable, PageTableEntry, PageTableEntryFlags, Phys};
+use crate::paging::{PageTable, PageTableEntry, PageTableEntryFlags, Phys, Page};
 use crate::virt_addr::VirtAddr;
 
 static PHYSICAL_OFFSET: Once<u64> = Once::new();
@@ -51,21 +51,22 @@ pub fn translate_addr(addr: &VirtAddr) -> Option<PhysAddr> {
 /// This is unsafe because if we map to an existing frame
 /// we can create aliased mutable references
 pub unsafe fn create_mapping<T: FrameAllocator>(
-    addr: &VirtAddr,
+    page: Page,
     entry: PageTableEntry,
     allocator: &mut T,
 ) {
-    create_mapping_inner(addr, entry, allocator);
+    create_mapping_inner(page, entry, allocator);
 }
 
 // TODO: Move these to a page table impl
 // TODO: Return a result here
 #[inline]
 fn create_mapping_inner<T: FrameAllocator>(
-    addr: &VirtAddr,
+    page: Page,
     entry: PageTableEntry,
     allocator: &mut T,
 ) {
+    let addr = page.as_virt_addr();
     let (level_4_table_frame, _) = Cr3::read();
     let mut frame: Phys = level_4_table_frame.into();
 
@@ -153,7 +154,7 @@ mod tests {
 
     use crate::{
         allocator::{ZeroAllocator, FRAME_ALLOCATOR},
-        paging::{PageTableEntry, PageTableEntryFlags},
+        paging::{PageTableEntry, PageTableEntryFlags, Page},
         vga_buffer::VGA_BUFFER_ADDRESS,
         virt_addr::VirtAddr,
     };
@@ -199,10 +200,11 @@ mod tests {
     #[test_case]
     fn add_valid_entry() {
         let addr = VirtAddr::new(5);
+        let page = Page::containing_address(addr);
         let frame = PhysFrame::<Size4KiB>::from_start_address(PhysAddr::new(4096)).unwrap();
         let entry = PageTableEntry::new(frame, PageTableEntryFlags::PRESENT);
 
-        unsafe { create_mapping(&addr, entry, &mut ZeroAllocator {}) };
+        unsafe { create_mapping(page, entry, &mut ZeroAllocator {}) };
 
         let phys_addr = translate_addr(&addr);
 
@@ -217,10 +219,11 @@ mod tests {
     #[test_case]
     fn add_valid_huge_entry() {
         let addr = get_offset();
+        let page = Page::containing_address(addr);
         let frame = PhysFrame::<Size4KiB>::from_start_address(PhysAddr::new(0)).unwrap();
         let entry = PageTableEntry::new(frame, PageTableEntryFlags::PRESENT);
 
-        unsafe { create_mapping(&addr, entry, &mut ZeroAllocator {}) };
+        unsafe { create_mapping(page, entry, &mut ZeroAllocator {}) };
 
         let phys_addr = translate_addr(&addr);
 
@@ -233,6 +236,7 @@ mod tests {
     #[test_case]
     fn add_allocation_entry() {
         let addr = VirtAddr::new(0xDEADBEEF);
+        let page = Page::containing_address(addr);
         let frame = PhysFrame::<Size4KiB>::from_start_address(PhysAddr::new(4096)).unwrap();
         let entry = PageTableEntry::new(frame, PageTableEntryFlags::PRESENT);
 
@@ -241,7 +245,7 @@ mod tests {
             None => panic!("boot info allocator not initialized"),
         };
 
-        unsafe { create_mapping(&addr, entry, &mut *alloc.lock()) };
+        unsafe { create_mapping(page, entry, &mut *alloc.lock()) };
 
         let phys_addr = translate_addr(&addr);
 

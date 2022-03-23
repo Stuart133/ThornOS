@@ -213,14 +213,22 @@ pub struct Page(VirtAddr);
 
 // TODO: Parameterize pages with size
 impl Page {
+    #[inline]
     pub fn containing_address(addr: VirtAddr) -> Self {
         Page(addr.align_down())
+    }
+
+    #[inline]
+    pub fn as_virt_addr(self) -> VirtAddr {
+        self.0
     }
 }
 
 impl Add<u64> for Page {
     type Output = Page;
 
+    // TODO: Test this
+    #[inline]
     fn add(self, rhs: u64) -> Self::Output {
         Page::containing_address(self.0 + 4096 * rhs)
     }
@@ -243,6 +251,7 @@ impl PageRangeInclusive {
 impl Iterator for PageRangeInclusive {
     type Item = Page;
 
+    // TODO: Test this
     fn next(&mut self) -> Option<Self::Item> {
         if self.start < self.end {
             let p = Some(self.start);
