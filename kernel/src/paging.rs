@@ -1,7 +1,4 @@
-use core::{
-    ops::{Add, Index, IndexMut},
-    slice::Iter,
-};
+use core::ops::{Add, Index, IndexMut};
 
 use bitflags::bitflags;
 use x86_64::{

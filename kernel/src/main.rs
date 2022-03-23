@@ -6,21 +6,10 @@
 
 extern crate alloc;
 
-use alloc::boxed::Box;
+use alloc::{boxed::Box, vec, rc::Rc, vec::Vec};
 use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
-use kernel::{
-    allocator::FRAME_ALLOCATOR,
-    memory::{create_mapping, translate_addr},
-    paging::{PageTableEntry, PageTableEntryFlags},
-    println,
-    vga_buffer::VGA_BUFFER_ADDRESS,
-    virt_addr::VirtAddr,
-};
-use x86_64::{
-    structures::paging::{PhysFrame, Size4KiB},
-    PhysAddr,
-};
+use kernel::{println, allocator::{init_heap, FRAME_ALLOCATOR}};
 
 entry_point!(kernel_main);
 
@@ -32,7 +21,26 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     #[cfg(test)]
     test_main();
 
+    let alloc = match FRAME_ALLOCATOR.wait() {
+        Some(a) => a,
+        None => panic!("boot info allocator not initialized"),
+    };
+    init_heap(&mut *alloc.lock());
+
     let x = Box::new(42);
+    println!("heap_value at {:p}", x);
+
+    let mut vec = Vec::new();
+    for i in 0..500 {
+        vec.push(i);
+    }
+    println!("vec at {:p}", vec.as_slice());
+
+    let ref_counted = Rc::new(vec![1, 2, 3]);
+    let cloned_ref = ref_counted.clone();
+    println!("current reference count is {}", Rc::strong_count(&cloned_ref));
+    core::mem::drop(ref_counted);
+    println!("current reference count is {}", Rc::strong_count(&cloned_ref));
 
     kernel::hlt_loop();
 }

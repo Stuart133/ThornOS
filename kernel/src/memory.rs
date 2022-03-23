@@ -3,7 +3,7 @@ use x86_64::registers::control::Cr3;
 use x86_64::PhysAddr;
 
 use crate::allocator::FrameAllocator;
-use crate::paging::{PageTable, PageTableEntry, PageTableEntryFlags, Phys, Page};
+use crate::paging::{Page, PageTable, PageTableEntry, PageTableEntryFlags, Phys};
 use crate::virt_addr::VirtAddr;
 
 static PHYSICAL_OFFSET: Once<u64> = Once::new();
@@ -61,11 +61,7 @@ pub unsafe fn create_mapping<T: FrameAllocator>(
 // TODO: Move these to a page table impl
 // TODO: Return a result here
 #[inline]
-fn create_mapping_inner<T: FrameAllocator>(
-    page: Page,
-    entry: PageTableEntry,
-    allocator: &mut T,
-) {
+fn create_mapping_inner<T: FrameAllocator>(page: Page, entry: PageTableEntry, allocator: &mut T) {
     let addr = page.as_virt_addr();
     let (level_4_table_frame, _) = Cr3::read();
     let mut frame: Phys = level_4_table_frame.into();
@@ -154,7 +150,7 @@ mod tests {
 
     use crate::{
         allocator::{ZeroAllocator, FRAME_ALLOCATOR},
-        paging::{PageTableEntry, PageTableEntryFlags, Page},
+        paging::{Page, PageTableEntry, PageTableEntryFlags},
         vga_buffer::VGA_BUFFER_ADDRESS,
         virt_addr::VirtAddr,
     };

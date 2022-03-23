@@ -1,6 +1,5 @@
-use core::{alloc::GlobalAlloc, ptr::null_mut};
-
 use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
+use linked_list_allocator::LockedHeap;
 use spin::{Mutex, Once};
 use x86_64::{
     structures::paging::{PageSize, PhysFrame, Size4KiB},
@@ -8,23 +7,24 @@ use x86_64::{
 };
 
 use crate::{
-    paging::{Page, PageRangeInclusive, PageTableEntryFlags, PageTableEntry},
-    virt_addr::VirtAddr, memory::create_mapping,
+    memory::create_mapping,
+    paging::{Page, PageRangeInclusive, PageTableEntry, PageTableEntryFlags},
+    virt_addr::VirtAddr,
 };
 
 pub static FRAME_ALLOCATOR: Once<Mutex<BootInfoAllocator>> = Once::new();
 
 #[global_allocator]
-static GLOBAL_ALLOCATOR: Dummy = Dummy;
+static GLOBAL_ALLOCATOR: LockedHeap = LockedHeap::empty();
 
-pub const HEAP_START: u64 = 0x4444_4444_0000;
-pub const HEAP_SIZE: u64 = 100 * 1024;
+pub const HEAP_START: usize = 0x4444_4444_0000;
+pub const HEAP_SIZE: usize = 100 * 1024;
 
 // TODO: Return a result here
 pub fn init_heap(frame_allocator: &mut impl FrameAllocator) {
     let page_range = {
-        let heap_start = VirtAddr::new(HEAP_START);
-        let heap_end = heap_start + (HEAP_SIZE - 1);
+        let heap_start = VirtAddr::new(HEAP_START.try_into().unwrap()); // TODO: Make this less gross
+        let heap_end = heap_start + (HEAP_SIZE - 1).try_into().unwrap();
         let heap_start_page = Page::containing_address(heap_start);
         let heap_end_page = Page::containing_address(heap_end);
         PageRangeInclusive::new(heap_start_page, heap_end_page)
@@ -34,9 +34,11 @@ pub fn init_heap(frame_allocator: &mut impl FrameAllocator) {
         let frame = frame_allocator.allocate().unwrap();
         let flags = PageTableEntryFlags::PRESENT | PageTableEntryFlags::WRITABLE;
         let entry = PageTableEntry::new(frame, flags);
-        unsafe {
-            create_mapping(page, entry, frame_allocator)
-        }
+        unsafe { create_mapping(page, entry, frame_allocator) }
+    }
+
+    unsafe {
+        GLOBAL_ALLOCATOR.lock().init(HEAP_START, HEAP_SIZE);
     }
 }
 
@@ -96,17 +98,5 @@ impl BootInfoAllocator {
         let frame_addresses = addr_ranges.flat_map(|r| r.step_by(4096));
 
         frame_addresses.map(|addr| PhysFrame::containing_address(PhysAddr::new(addr)))
-    }
-}
-
-pub struct Dummy;
-
-unsafe impl GlobalAlloc for Dummy {
-    unsafe fn alloc(&self, _layout: core::alloc::Layout) -> *mut u8 {
-        null_mut()
-    }
-
-    unsafe fn dealloc(&self, _ptr: *mut u8, _layout: core::alloc::Layout) {
-        panic!("dealloc should never be called")
     }
 }
