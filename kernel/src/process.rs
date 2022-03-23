@@ -42,8 +42,5 @@ fn init_process() {}
 
 #[allow(unreachable_code)]
 fn init_process_list() -> [Mutex<Process>; NPROC] {
-    [
-        Mutex::new(Process::new()),
-        Mutex::new(Process::new()),
-    ]
+    [Mutex::new(Process::new()), Mutex::new(Process::new())]
 }

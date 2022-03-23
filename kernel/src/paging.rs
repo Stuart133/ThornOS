@@ -1,10 +1,15 @@
-use core::ops::{Index, IndexMut};
+use core::{
+    ops::{Add, Index, IndexMut},
+    slice::Iter,
+};
 
 use bitflags::bitflags;
 use x86_64::{
     structures::paging::{PageSize, PhysFrame, Size1GiB, Size2MiB, Size4KiB},
     PhysAddr,
 };
+
+use crate::virt_addr::VirtAddr;
 
 const PAGE_TABLE_SIZE: usize = 512;
 
@@ -199,6 +204,53 @@ impl Phys {
 impl From<PhysFrame> for Phys {
     fn from(p: PhysFrame) -> Self {
         Phys::Size4Kb(p)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(transparent)]
+pub struct Page(VirtAddr);
+
+// TODO: Parameterize pages with size
+impl Page {
+    pub fn containing_address(addr: VirtAddr) -> Self {
+        Page(addr.align_down())
+    }
+}
+
+impl Add<u64> for Page {
+    type Output = Page;
+
+    fn add(self, rhs: u64) -> Self::Output {
+        Page::containing_address(self.0 + 4096 * rhs)
+    }
+}
+
+pub struct PageRangeInclusive {
+    start: Page,
+    end: Page,
+}
+
+impl PageRangeInclusive {
+    pub fn new(start: Page, end: Page) -> Self {
+        PageRangeInclusive {
+            start: start,
+            end: end,
+        }
+    }
+}
+
+impl Iterator for PageRangeInclusive {
+    type Item = Page;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.start < self.end {
+            let p = Some(self.start);
+            self.start = self.start + 1;
+            p
+        } else {
+            None
+        }
     }
 }
 

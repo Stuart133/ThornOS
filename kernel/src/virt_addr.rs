@@ -2,7 +2,7 @@ use core::ops::Add;
 
 use crate::paging::{PageOffset, PageTableIndex};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(transparent)]
 pub struct VirtAddr(u64);
 
@@ -10,6 +10,12 @@ impl VirtAddr {
     // TODO: Make this canonical
     pub fn new(addr: u64) -> VirtAddr {
         VirtAddr(addr)
+    }
+
+    /// Align downwards to the nearest page boundary
+    #[inline]
+    pub fn align_down(&self) -> VirtAddr {
+        VirtAddr::new(self.0 & 0xFFFF_FFFF_FFFF_F000)
     }
 
     #[inline]
@@ -51,6 +57,13 @@ impl Add<u64> for VirtAddr {
 #[cfg(test)]
 mod tests {
     use super::VirtAddr;
+
+    #[test_case]
+    fn align_down() {
+        let addr = VirtAddr::new(0xE677_BF54_D244);
+        let aligned = addr.align_down();
+        assert_eq!(aligned.as_u64(), 0xE677_BF54_D000);
+    }
 
     #[test_case]
     fn get_page_offset() {

@@ -7,17 +7,38 @@ use x86_64::{
     PhysAddr,
 };
 
+use crate::{
+    paging::{Page, PageRangeInclusive},
+    virt_addr::VirtAddr,
+};
+
 pub static FRAME_ALLOCATOR: Once<Mutex<BootInfoAllocator>> = Once::new();
 
 #[global_allocator]
 static GLOBAL_ALLOCATOR: Dummy = Dummy;
+
+pub const HEAP_START: u64 = 0x4444_4444_0000;
+pub const HEAP_SIZE: u64 = 100 * 1024;
+
+pub fn init_heap() {
+    let page_range = {
+        let heap_start = VirtAddr::new(HEAP_START);
+        let heap_end = heap_start + (HEAP_SIZE - 1);
+        let heap_start_page = Page::containing_address(heap_start);
+        let heap_end_page = Page::containing_address(heap_end);
+        PageRangeInclusive::new(heap_start_page, heap_end_page)
+    };
+
+    for page in page_range {}
+}
 
 /// Initialize the boot info allocator
 ///
 /// This is unsafe because the caller must guarantee that the passed
 /// memory map is valid. All froms marked as USABLE must actually be unused
 pub unsafe fn init(memory_map: &'static MemoryMap) {
-    FRAME_ALLOCATOR.call_once(|| Mutex::<BootInfoAllocator>::new(BootInfoAllocator::init(memory_map)));
+    FRAME_ALLOCATOR
+        .call_once(|| Mutex::<BootInfoAllocator>::new(BootInfoAllocator::init(memory_map)));
 }
 
 pub trait FrameAllocator<S: PageSize = Size4KiB> {

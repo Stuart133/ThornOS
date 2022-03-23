@@ -7,7 +7,7 @@
 #![reexport_test_harness_main = "test_main"]
 
 use bootloader::BootInfo;
-use core::{panic::PanicInfo, alloc::Layout};
+use core::{alloc::Layout, panic::PanicInfo};
 
 extern crate alloc;
 

@@ -17,6 +17,7 @@ pub unsafe fn init(physical_memory_offset: u64) {
     PHYSICAL_OFFSET.call_once(|| physical_memory_offset);
 }
 
+// TODO: Move these to a page table impl
 /// Translate a virtual address into a physical one
 pub fn translate_addr(addr: &VirtAddr) -> Option<PhysAddr> {
     let (level_4_table_frame, _) = Cr3::read();
@@ -57,8 +58,14 @@ pub unsafe fn create_mapping<T: FrameAllocator>(
     create_mapping_inner(addr, entry, allocator);
 }
 
+// TODO: Move these to a page table impl
+// TODO: Return a result here
 #[inline]
-fn create_mapping_inner<T: FrameAllocator>(addr: &VirtAddr, entry: PageTableEntry, allocator: &mut T) {
+fn create_mapping_inner<T: FrameAllocator>(
+    addr: &VirtAddr,
+    entry: PageTableEntry,
+    allocator: &mut T,
+) {
     let (level_4_table_frame, _) = Cr3::read();
     let mut frame: Phys = level_4_table_frame.into();
 

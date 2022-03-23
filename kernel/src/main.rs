@@ -28,33 +28,11 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     println!("Hello world{}", "!");
 
     kernel::init(boot_info);
-    let alloc = match FRAME_ALLOCATOR.wait() {
-        Some(a) => a,
-        None => panic!("boot info allocator not initialized"),
-    };
 
     #[cfg(test)]
     test_main();
 
     let x = Box::new(42);
-
-    let zero_addr = VirtAddr::new(0xDEADBEEF);
-    let frame =
-        PhysFrame::<Size4KiB>::from_start_address(PhysAddr::new(VGA_BUFFER_ADDRESS)).unwrap();
-    let entry = PageTableEntry::new(
-        frame,
-        PageTableEntryFlags::PRESENT | PageTableEntryFlags::WRITABLE,
-    );
-
-    unsafe { create_mapping(&zero_addr, entry, &mut *alloc.lock()) };
-
-    let addresses = [0xDEADBEEF];
-
-    for addr in addresses {
-        let virt = VirtAddr::new(addr);
-        let phys = translate_addr(&virt);
-        println!("{:#x} -> {:?}", virt.as_u64(), phys);
-    }
 
     kernel::hlt_loop();
 }
