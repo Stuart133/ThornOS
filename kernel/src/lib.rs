@@ -7,7 +7,7 @@
 #![reexport_test_harness_main = "test_main"]
 
 use bootloader::BootInfo;
-use core::{alloc::Layout, panic::PanicInfo};
+use core::{alloc::Layout, cmp::max, panic::PanicInfo};
 
 extern crate alloc;
 
@@ -53,24 +53,41 @@ pub fn exit_qemu(exit_code: QemuExitCode) {
 }
 
 pub trait Testable {
-    fn run(&self) -> ();
+    fn run(&self, longest: usize) -> ();
+    fn name_length(&self) -> usize;
 }
 
 impl<T> Testable for T
 where
     T: Fn(),
 {
-    fn run(&self) {
-        serial_print!("{}...\t\t", core::any::type_name::<T>());
+    fn run(&self, longest: usize) {
+        serial_print!("{}...", core::any::type_name::<T>());
+
+        let indent = longest - core::any::type_name::<T>().len();
+        for _ in 0..indent + 2 {
+            serial_print!(" ");
+        }
+
         self();
         serial_println!("[ok]");
+    }
+
+    fn name_length(&self) -> usize {
+        core::any::type_name::<T>().len()
     }
 }
 
 pub fn test_runner(tests: &[&dyn Testable]) {
     serial_println!("Running {} tests", tests.len());
+
+    let mut longest = 0;
     for test in tests {
-        test.run();
+        longest = max(longest, test.name_length());
+    }
+
+    for test in tests {
+        test.run(longest);
     }
 
     exit_qemu(QemuExitCode::Success);

@@ -20,7 +20,6 @@ static GLOBAL_ALLOCATOR: LockedHeap = LockedHeap::empty();
 pub const HEAP_START: usize = 0x4444_4444_0000;
 pub const HEAP_SIZE: usize = 100 * 1024;
 
-// TODO: Return a result here
 pub fn init_heap(frame_allocator: &mut impl FrameAllocator) -> Result<(), ()> {
     let page_range = {
         let heap_start = VirtAddr::new(HEAP_START.try_into().unwrap()); // TODO: Make this less gross
