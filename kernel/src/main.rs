@@ -6,10 +6,13 @@
 
 extern crate alloc;
 
-use alloc::{boxed::Box, vec, rc::Rc, vec::Vec};
+use alloc::{boxed::Box, rc::Rc, vec, vec::Vec};
 use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
-use kernel::{println, allocator::{init_heap, FRAME_ALLOCATOR}};
+use kernel::{
+    allocator::{init_heap, FRAME_ALLOCATOR},
+    println,
+};
 
 entry_point!(kernel_main);
 
@@ -38,9 +41,15 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
     let ref_counted = Rc::new(vec![1, 2, 3]);
     let cloned_ref = ref_counted.clone();
-    println!("current reference count is {}", Rc::strong_count(&cloned_ref));
+    println!(
+        "current reference count is {}",
+        Rc::strong_count(&cloned_ref)
+    );
     core::mem::drop(ref_counted);
-    println!("current reference count is {}", Rc::strong_count(&cloned_ref));
+    println!(
+        "current reference count is {}",
+        Rc::strong_count(&cloned_ref)
+    );
 
     kernel::hlt_loop();
 }
