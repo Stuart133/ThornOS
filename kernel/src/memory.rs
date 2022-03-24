@@ -59,6 +59,7 @@ pub unsafe fn map_page<T: FrameAllocator>(
 }
 
 // TODO: Move these to a page table impl
+// TODO: Allow huge page mapping
 #[inline]
 fn map_page_inner<T: FrameAllocator>(
     page: Page,
@@ -81,6 +82,12 @@ fn map_page_inner<T: FrameAllocator>(
             Some(f) => match f {
                 Phys::Size2Mb(_) | Phys::Size1Gb(_) => {
                     // Set the table entry here so we can index the correct virtual address PTE level
+                    if table[addr.page_table_index(0)]
+                        .flags()
+                        .contains(PageTableEntryFlags::PRESENT)
+                    {
+                        return Err(PageMapError::PageAlreadyMapped);
+                    }
                     table[addr.page_table_index(level)] = entry;
                     return Ok(());
                 }
@@ -99,11 +106,18 @@ fn map_page_inner<T: FrameAllocator>(
                             table[index] = entry;
                             frame = Phys::Size4Kb(f);
                         }
-                        None => return Err(PageMapError::FrameAllocationError),
+                        None => return Err(PageMapError::FrameAllocation),
                     }
                 }
             }
         }
+    }
+
+    if table[addr.page_table_index(0)]
+        .flags()
+        .contains(PageTableEntryFlags::PRESENT)
+    {
+        return Err(PageMapError::PageAlreadyMapped);
     }
 
     table[addr.page_table_index(0)] = entry;
@@ -111,8 +125,10 @@ fn map_page_inner<T: FrameAllocator>(
 }
 
 // TODO: Parameterize with page size
+#[derive(Debug)]
 pub enum PageMapError {
-    FrameAllocationError,
+    FrameAllocation,
+    PageAlreadyMapped,
 }
 
 #[inline]
@@ -209,7 +225,7 @@ mod tests {
         let result = unsafe { map_page(page, entry, &mut ZeroAllocator {}) };
         match result {
             Ok(_) => {}
-            Err(PageMapError::FrameAllocationError) => panic!("physical frame allocation failed"),
+            Err(err) => panic!("error mapping page: {:?}", err),
         }
 
         let phys_addr = translate_addr(&addr);
@@ -220,26 +236,20 @@ mod tests {
         }
     }
 
-    // The physical memory is mapped into huge pages - Remap Offset -> 0 to ensure huge pages
-    // can be mapped into correctly
     #[test_case]
-    fn add_valid_huge_entry() {
-        let addr = get_offset();
-        let page = Page::containing_address(addr);
-        let frame = PhysFrame::<Size4KiB>::from_start_address(PhysAddr::new(0)).unwrap();
-        let entry = PageTableEntry::new(frame, PageTableEntryFlags::PRESENT);
+    fn try_to_remap() {
+        let addrs = [get_offset(), VirtAddr::new(VGA_BUFFER_ADDRESS)];
+        for addr in addrs {
+            let page = Page::containing_address(addr);
+            let frame = PhysFrame::<Size4KiB>::from_start_address(PhysAddr::new(0)).unwrap();
+            let entry = PageTableEntry::new(frame, PageTableEntryFlags::PRESENT);
 
-        let result = unsafe { map_page(page, entry, &mut ZeroAllocator {}) };
-        match result {
-            Ok(_) => {}
-            Err(PageMapError::FrameAllocationError) => panic!("physical frame allocation failed"),
-        }
-
-        let phys_addr = translate_addr(&addr);
-
-        match phys_addr {
-            Some(pa) => assert_eq!(pa.as_u64(), 0),
-            None => panic!("new page was not mapped to correct physical frame"),
+            let result = unsafe { map_page(page, entry, &mut ZeroAllocator {}) };
+            match result {
+                Ok(_) => panic!("page should not be remapped"),
+                Err(PageMapError::PageAlreadyMapped) => {}
+                Err(err) => panic!("error mapping page: {:?}", err),
+            }
         }
     }
 
@@ -258,7 +268,7 @@ mod tests {
         let result = unsafe { map_page(page, entry, &mut *alloc.lock()) };
         match result {
             Ok(_) => {}
-            Err(PageMapError::FrameAllocationError) => panic!("physical frame allocation failed"),
+            Err(err) => panic!("error mapping page: {:?}", err),
         }
 
         let phys_addr = translate_addr(&addr);

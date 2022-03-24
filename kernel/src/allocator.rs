@@ -76,6 +76,7 @@ pub struct BootInfoAllocator {
 }
 
 impl FrameAllocator for BootInfoAllocator {
+    // TODO: Deallocate frames
     fn allocate(&mut self) -> Option<PhysFrame> {
         let frame = self.usable_frames().nth(self.next);
         self.next += 1;
