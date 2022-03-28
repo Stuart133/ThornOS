@@ -60,10 +60,11 @@ pub unsafe fn map_page<T: FrameAllocator>(
 
 // TODO: Move these to a page table impl
 // TODO: Allow huge page mapping
+// TODO: Handle huge pages properly
 #[inline]
 fn map_page_inner<T: FrameAllocator>(
     page: Page,
-    entry: PageTableEntry,
+    new_entry: PageTableEntry,
     allocator: &mut T,
 ) -> Result<(), PageMapError> {
     let addr = page.as_virt_addr();
@@ -82,13 +83,13 @@ fn map_page_inner<T: FrameAllocator>(
             Some(f) => match f {
                 Phys::Size2Mb(_) | Phys::Size1Gb(_) => {
                     // Set the table entry here so we can index the correct virtual address PTE level
-                    if table[addr.page_table_index(0)]
+                    if table[addr.page_table_index(level)]
                         .flags()
                         .contains(PageTableEntryFlags::PRESENT)
                     {
                         return Err(PageMapError::PageAlreadyMapped);
                     }
-                    table[addr.page_table_index(level)] = entry;
+                    table[addr.page_table_index(level)] = new_entry;
                     return Ok(());
                 }
                 _ => frame = f,
@@ -120,7 +121,7 @@ fn map_page_inner<T: FrameAllocator>(
         return Err(PageMapError::PageAlreadyMapped);
     }
 
-    table[addr.page_table_index(0)] = entry;
+    table[addr.page_table_index(0)] = new_entry;
     Ok(())
 }
 
