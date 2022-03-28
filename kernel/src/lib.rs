@@ -15,6 +15,7 @@ pub mod allocator;
 pub mod gdt;
 pub mod interrupts;
 pub mod memory;
+pub mod pagetable;
 pub mod paging;
 pub mod process;
 pub mod serial;

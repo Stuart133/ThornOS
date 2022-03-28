@@ -1,4 +1,4 @@
-use core::ops::{Add, Index, IndexMut};
+use core::ops::Add;
 
 use bitflags::bitflags;
 use x86_64::{
@@ -6,56 +6,7 @@ use x86_64::{
     PhysAddr,
 };
 
-use crate::virt_addr::VirtAddr;
-
-const PAGE_TABLE_SIZE: usize = 512;
-
-#[repr(align(4096))]
-#[repr(C)]
-#[derive(Debug)]
-pub struct PageTable {
-    entries: [PageTableEntry; PAGE_TABLE_SIZE],
-}
-
-impl PageTable {
-    pub fn new() -> Self {
-        PageTable {
-            entries: [PageTableEntry::new_zero(); PAGE_TABLE_SIZE],
-        }
-    }
-}
-
-impl Index<usize> for PageTable {
-    type Output = PageTableEntry;
-
-    #[inline]
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.entries[index]
-    }
-}
-
-impl Index<PageTableIndex> for PageTable {
-    type Output = PageTableEntry;
-
-    #[inline]
-    fn index(&self, index: PageTableIndex) -> &Self::Output {
-        &self.entries[usize::from(index)]
-    }
-}
-
-impl IndexMut<usize> for PageTable {
-    #[inline]
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.entries[index]
-    }
-}
-
-impl IndexMut<PageTableIndex> for PageTable {
-    #[inline]
-    fn index_mut(&mut self, index: PageTableIndex) -> &mut Self::Output {
-        &mut self.entries[usize::from(index)]
-    }
-}
+use crate::{pagetable::PageTable, virt_addr::VirtAddr};
 
 /// Guaranteed to hold only values from 0..4096
 #[derive(Debug)]
@@ -153,7 +104,8 @@ impl PageTableEntry {
         PageTableEntry(frame.start_address().as_u64() | flags.bits)
     }
 
-    fn new_zero() -> Self {
+    // TODO: Better name for this
+    pub fn new_zero() -> Self {
         PageTableEntry(0)
     }
 

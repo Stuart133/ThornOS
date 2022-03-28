@@ -7,9 +7,8 @@ use x86_64::{
 };
 
 use crate::{
-    memory::map_page,
     paging::{Page, PageRangeInclusive, PageTableEntry, PageTableEntryFlags},
-    virt_addr::VirtAddr,
+    virt_addr::VirtAddr, memory::load_active_pagetable,
 };
 
 pub static FRAME_ALLOCATOR: Once<Mutex<BootInfoAllocator>> = Once::new();
@@ -21,6 +20,8 @@ pub const HEAP_START: usize = 0x4444_4444_0000;
 pub const HEAP_SIZE: usize = 100 * 1024;
 
 pub fn init_heap(frame_allocator: &mut impl FrameAllocator) -> Result<(), ()> {
+    let table = load_active_pagetable();
+
     let page_range = {
         let heap_start = VirtAddr::new(HEAP_START.try_into().unwrap()); // TODO: Make this less gross
         let heap_end = heap_start + (HEAP_SIZE - 1).try_into().unwrap();
@@ -33,7 +34,7 @@ pub fn init_heap(frame_allocator: &mut impl FrameAllocator) -> Result<(), ()> {
         let frame = frame_allocator.allocate().unwrap();
         let flags = PageTableEntryFlags::PRESENT | PageTableEntryFlags::WRITABLE;
         let entry = PageTableEntry::new(frame, flags);
-        let page_result = unsafe { map_page(page, entry, frame_allocator) };
+        let page_result = unsafe { table.map_page(page, entry, frame_allocator) };
         match page_result {
             Ok(_) => {}
             Err(_) => return Err(()),

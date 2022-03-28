@@ -1,7 +1,7 @@
 use lazy_static::lazy_static;
 use spin::Mutex;
 
-use crate::paging::PageTable;
+use crate::pagetable::PageTable;
 
 const NPROC: usize = 2;
 
