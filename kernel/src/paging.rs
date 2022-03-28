@@ -6,7 +6,7 @@ use x86_64::{
     PhysAddr,
 };
 
-use crate::{pagetable::PageTable, virt_addr::VirtAddr};
+use crate::virt_addr::VirtAddr;
 
 /// Guaranteed to hold only values from 0..4096
 #[derive(Debug)]

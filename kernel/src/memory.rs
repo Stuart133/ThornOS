@@ -24,9 +24,9 @@ pub fn get_offset() -> VirtAddr {
 }
 
 // TODO - Mark this unsafe and write description
-pub fn load_active_pagetable<'a>() -> &'a PageTable {
+pub fn load_active_pagetable<'a>() -> &'a mut PageTable {
     let (page_table, _) = Cr3::read();
     let frame = page_table.into();
 
-    unsafe { PageTable::load_table(frame) }
+    unsafe { PageTable::load_mut_table(frame) }
 }

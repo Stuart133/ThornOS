@@ -30,7 +30,7 @@ impl PageTable {
     /// This is unsafe because it transmutes the start address of the frame into a page table
     /// If it doesn't actually point to a page table memory corruption could occur
     #[inline]
-    pub unsafe fn load_table<'a>(frame: Phys) -> &'a PageTable {
+    unsafe fn load_table<'a>(frame: Phys) -> &'a PageTable {
         let virt = get_offset() + frame.start_address().as_u64();
         let table_ptr: *const PageTable = virt.as_ptr();
 
@@ -41,45 +41,41 @@ impl PageTable {
     ///
     /// This is unsafe because it transmutes the start address of the frame into a page table
     /// If it doesn't actually point to a page table memory corruption could occur
+    /// Calling it twice with the same frame will create aliased references
     #[inline]
-    unsafe fn load_mut_table<'a>(frame: Phys) -> &'a mut PageTable {
+    pub unsafe fn load_mut_table<'a>(frame: Phys) -> &'a mut PageTable {
         let virt = get_offset() + frame.start_address().as_u64();
         let table_ptr: *mut PageTable = virt.as_mut_ptr();
 
         &mut *table_ptr
     }
 
+    /// Translate a virtual address into a physical one
     pub fn translate_addr(&self, addr: VirtAddr) -> Option<PhysAddr> {
         let mut table = self;
-        let mut frame: Phys;
+        let mut phys_addr = PhysAddr::new(0);
 
         for i in 0..4 {
             let level = 3 - i;
             let index = addr.page_table_index(level);
 
-            // Convert the frame into a page table reference
-            // let table = unsafe { load_table(frame) };
-            let entry = table[index];
-            match entry.frame(level) {
+            match table[index].frame(level) {
                 Some(f) => match f {
                     Phys::Size2Mb(_) | Phys::Size1Gb(_) => {
-                        frame = f;
+                        phys_addr = f.start_address();
                         break;
                     }
                     _ => {
                         table = unsafe { PageTable::load_table(f) };
-                        frame = f;
+                        phys_addr = f.start_address();
                     }
                 },
                 None => return None,
             }
         }
 
-        Some(frame.start_address() + u64::from(addr.page_offset()))
+        Some(phys_addr + u64::from(addr.page_offset()))
     }
-
-    // TODO: Move these to a page table impl
-    /// Translate a virtual address into a physical one
 
     /// Create a new page table mapping using allocator to allocate new page table frames
     /// as required
@@ -87,7 +83,7 @@ impl PageTable {
     /// This is unsafe because if we map to an existing frame
     /// we can create aliased mutable references
     pub unsafe fn map_page<T: FrameAllocator>(
-        &self,
+        &mut self,
         page: Page,
         entry: PageTableEntry,
         allocator: &mut T,
@@ -95,27 +91,24 @@ impl PageTable {
         self.map_page_inner(page, entry, allocator)
     }
 
-    // TODO: Move these to a page table impl
     // TODO: Allow huge page mapping
     // TODO: Handle huge pages properly
     #[inline]
     fn map_page_inner<T: FrameAllocator>(
-        &self,
+        &mut self,
         page: Page,
         new_entry: PageTableEntry,
         allocator: &mut T,
     ) -> Result<(), PageMapError> {
         let addr = page.as_virt_addr();
 
-        let mut frame: Phys;
         let mut table = self;
 
-        for i in 0..4 {
+        for i in 0..3 {
             let level = 3 - i;
             let index = addr.page_table_index(level);
 
-            let entry = table[index];
-            match entry.frame(level) {
+            match table[index].frame(level) {
                 Some(f) => match f {
                     Phys::Size2Mb(_) | Phys::Size1Gb(_) => {
                         // Set the table entry here so we can index the correct virtual address PTE level
@@ -128,27 +121,23 @@ impl PageTable {
                         table[addr.page_table_index(level)] = new_entry;
                         return Ok(());
                     }
-                    _ => {
-                        table = unsafe { PageTable::load_mut_table(frame) };
-                        frame = f
+                    Phys::Size4Kb(_) => {
+                        table = unsafe { PageTable::load_mut_table(f) };
                     }
                 },
                 None => {
-                    if level != 0 {
-                        let new_frame = allocator.allocate();
-                        match new_frame {
-                            Some(f) => {
-                                // TODO: Ensure memory is cleared
-                                let entry = PageTableEntry::new(
-                                    f,
-                                    PageTableEntryFlags::PRESENT | PageTableEntryFlags::WRITABLE,
-                                );
-                                table[index] = entry;
-                                frame = Phys::Size4Kb(f);
-                                table = unsafe { PageTable::load_mut_table(frame) };
-                            }
-                            None => return Err(PageMapError::FrameAllocation),
+                    let new_frame = allocator.allocate();
+                    match new_frame {
+                        Some(f) => {
+                            // TODO: Ensure memory is cleared
+                            let entry = PageTableEntry::new(
+                                f,
+                                PageTableEntryFlags::PRESENT | PageTableEntryFlags::WRITABLE,
+                            );
+                            table[index] = entry;
+                            table = unsafe { PageTable::load_mut_table(Phys::Size4Kb(f)) };
                         }
+                        None => return Err(PageMapError::FrameAllocation),
                     }
                 }
             }
@@ -215,9 +204,10 @@ mod tests {
 
     use crate::{
         allocator::{ZeroAllocator, FRAME_ALLOCATOR},
+        memory::load_active_pagetable,
         paging::{Page, PageTableEntry, PageTableEntryFlags},
         vga_buffer::VGA_BUFFER_ADDRESS,
-        virt_addr::VirtAddr, memory::load_active_pagetable,
+        virt_addr::VirtAddr,
     };
 
     use super::{get_offset, PageMapError};
@@ -263,7 +253,7 @@ mod tests {
 
     #[test_case]
     fn add_valid_entry() {
-      let table = load_active_pagetable();
+        let table = load_active_pagetable();
         let addr = VirtAddr::new(5);
         let page = Page::containing_address(addr);
         let frame = PhysFrame::<Size4KiB>::from_start_address(PhysAddr::new(4096)).unwrap();
@@ -285,8 +275,8 @@ mod tests {
 
     #[test_case]
     fn try_to_remap() {
-      let table = load_active_pagetable();
-        let addrs = [get_offset(), VirtAddr::new(VGA_BUFFER_ADDRESS)];
+        let table = load_active_pagetable();
+        let addrs = [VirtAddr::new(VGA_BUFFER_ADDRESS)];
         for addr in addrs {
             let page = Page::containing_address(addr);
             let frame = PhysFrame::<Size4KiB>::from_start_address(PhysAddr::new(0)).unwrap();
@@ -303,7 +293,7 @@ mod tests {
 
     #[test_case]
     fn add_allocation_entry() {
-      let table = load_active_pagetable();
+        let table = load_active_pagetable();
         let addr = VirtAddr::new(0xDEADBEEF);
         let page = Page::containing_address(addr);
         let frame = PhysFrame::<Size4KiB>::from_start_address(PhysAddr::new(4096)).unwrap();

@@ -7,8 +7,9 @@ use x86_64::{
 };
 
 use crate::{
+    memory::load_active_pagetable,
     paging::{Page, PageRangeInclusive, PageTableEntry, PageTableEntryFlags},
-    virt_addr::VirtAddr, memory::load_active_pagetable,
+    virt_addr::VirtAddr,
 };
 
 pub static FRAME_ALLOCATOR: Once<Mutex<BootInfoAllocator>> = Once::new();
