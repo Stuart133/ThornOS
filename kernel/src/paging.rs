@@ -100,6 +100,7 @@ bitflags! {
 pub struct PageTableEntry(u64);
 
 impl PageTableEntry {
+    // TODO - Validate huge page flag with passed page size
     pub fn new<S: PageSize>(frame: PhysFrame<S>, flags: PageTableEntryFlags) -> Self {
         PageTableEntry(frame.start_address().as_u64() | flags.bits)
     }

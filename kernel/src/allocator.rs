@@ -21,7 +21,7 @@ pub const HEAP_START: usize = 0x4444_4444_0000;
 pub const HEAP_SIZE: usize = 100 * 1024;
 
 pub fn init_heap(frame_allocator: &mut impl FrameAllocator) -> Result<(), ()> {
-    let table = load_active_pagetable();
+    let table = unsafe { load_active_pagetable() };
 
     let page_range = {
         let heap_start = VirtAddr::new(HEAP_START.try_into().unwrap()); // TODO: Make this less gross

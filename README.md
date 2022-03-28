@@ -24,7 +24,6 @@ Some general TODOs for now
 - Improve test framework
   - Panic tests
   - Skip tests
-  - Better output formatting
 - Design syscall interface
 - ELF loader
 - Shell

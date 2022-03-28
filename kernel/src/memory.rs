@@ -23,10 +23,13 @@ pub fn get_offset() -> VirtAddr {
     }
 }
 
-// TODO - Mark this unsafe and write description
-pub fn load_active_pagetable<'a>() -> &'a mut PageTable {
+/// Get the currently active pagetable from the cr3 register
+///
+/// This is unsafe as it can create aliased references if the active
+/// pagetable is referenced anywhere else
+pub unsafe fn load_active_pagetable<'a>() -> &'a mut PageTable {
     let (page_table, _) = Cr3::read();
     let frame = page_table.into();
 
-    unsafe { PageTable::load_mut_table(frame) }
+    PageTable::load_mut_table(frame) // This is safe as the physical address has been loaded directly from cr3
 }

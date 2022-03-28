@@ -194,7 +194,7 @@ pub enum PageMapError {
     PageAlreadyMapped,
 }
 
-// TODO: Use a fresh pagetable in these tests
+// TODO: Add huge page tests
 #[cfg(test)]
 mod tests {
     use x86_64::{
@@ -204,96 +204,28 @@ mod tests {
 
     use crate::{
         allocator::{ZeroAllocator, FRAME_ALLOCATOR},
-        memory::load_active_pagetable,
         paging::{Page, PageTableEntry, PageTableEntryFlags},
         vga_buffer::VGA_BUFFER_ADDRESS,
         virt_addr::VirtAddr,
     };
 
-    use super::{get_offset, PageMapError};
+    use super::{PageMapError, PageTable};
 
-    // We know the VGA buffer is identity mapped by the bootloader
     #[test_case]
-    fn translate_vga_address() {
-        let table = load_active_pagetable();
-        let addr = VirtAddr::new(VGA_BUFFER_ADDRESS);
+    fn get_unmapped_address() {
+        let table = PageTable::new();
+        let addr = VirtAddr::new(1234);
         let phys_addr = table.translate_addr(addr);
 
         match phys_addr {
-            Some(pa) => assert_eq!(addr.as_u64(), pa.as_u64()),
-            None => panic!("vga virtual address was not mapped"),
-        };
-    }
-
-    // We know that physical address 0 is mapped & uses huge pages (This could be flaky down the line)
-    #[test_case]
-    fn translate_address_0() {
-        // Physical Address 0 is at the map offset + 0
-        let table = load_active_pagetable();
-        let addr = get_offset();
-        let phys_addr = table.translate_addr(addr);
-
-        match phys_addr {
-            Some(pa) => assert_eq!(pa.as_u64(), 0),
-            None => panic!("physical memory was not mapped"),
-        };
-    }
-
-    #[test_case]
-    fn translate_missing_address() {
-        let table = load_active_pagetable();
-        let addr = VirtAddr::new(0xDEADBEEF);
-        let phys_addr = table.translate_addr(addr);
-
-        match phys_addr {
-            Some(pa) => panic!("0xDEADBEEF was mapped to {} unexpectedly", pa.as_u64()),
+            Some(pa) => panic!("{:?} was mapped to {} unexpectedly", addr, pa.as_u64()),
             None => (),
         };
     }
 
     #[test_case]
     fn add_valid_entry() {
-        let table = load_active_pagetable();
-        let addr = VirtAddr::new(5);
-        let page = Page::containing_address(addr);
-        let frame = PhysFrame::<Size4KiB>::from_start_address(PhysAddr::new(4096)).unwrap();
-        let entry = PageTableEntry::new(frame, PageTableEntryFlags::PRESENT);
-
-        let result = unsafe { table.map_page(page, entry, &mut ZeroAllocator {}) };
-        match result {
-            Ok(_) => {}
-            Err(err) => panic!("error mapping page: {:?}", err),
-        }
-
-        let phys_addr = table.translate_addr(addr);
-
-        match phys_addr {
-            Some(pa) => assert_eq!(pa.as_u64(), 4101),
-            None => panic!("new page was not mapped to correct physical frame"),
-        }
-    }
-
-    #[test_case]
-    fn try_to_remap() {
-        let table = load_active_pagetable();
-        let addrs = [VirtAddr::new(VGA_BUFFER_ADDRESS)];
-        for addr in addrs {
-            let page = Page::containing_address(addr);
-            let frame = PhysFrame::<Size4KiB>::from_start_address(PhysAddr::new(0)).unwrap();
-            let entry = PageTableEntry::new(frame, PageTableEntryFlags::PRESENT);
-
-            let result = unsafe { table.map_page(page, entry, &mut ZeroAllocator {}) };
-            match result {
-                Ok(_) => panic!("page should not be remapped"),
-                Err(PageMapError::PageAlreadyMapped) => {}
-                Err(err) => panic!("error mapping page: {:?}", err),
-            }
-        }
-    }
-
-    #[test_case]
-    fn add_allocation_entry() {
-        let table = load_active_pagetable();
+        let mut table = PageTable::new();
         let addr = VirtAddr::new(0xDEADBEEF);
         let page = Page::containing_address(addr);
         let frame = PhysFrame::<Size4KiB>::from_start_address(PhysAddr::new(4096)).unwrap();
@@ -315,6 +247,24 @@ mod tests {
         match phys_addr {
             Some(pa) => assert_eq!(pa.as_u64(), addr.page_offset().as_u64() + 4096),
             None => panic!("new page was not mapped to correct physical frame"),
+        }
+    }
+
+    #[test_case]
+    fn try_to_remap() {
+        let mut table = PageTable::new();
+        let addrs = [VirtAddr::new(VGA_BUFFER_ADDRESS)];
+        for addr in addrs {
+            let page = Page::containing_address(addr);
+            let frame = PhysFrame::<Size4KiB>::from_start_address(PhysAddr::new(0)).unwrap();
+            let entry = PageTableEntry::new(frame, PageTableEntryFlags::PRESENT);
+
+            let result = unsafe { table.map_page(page, entry, &mut ZeroAllocator {}) };
+            match result {
+                Ok(_) => panic!("page should not be remapped"),
+                Err(PageMapError::PageAlreadyMapped) => {}
+                Err(err) => panic!("error mapping page: {:?}", err),
+            }
         }
     }
 }
