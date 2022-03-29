@@ -33,3 +33,11 @@ pub unsafe fn load_active_pagetable<'a>() -> &'a mut PageTable {
 
     PageTable::load_mut_table(frame) // This is safe as the physical address has been loaded directly from cr3
 }
+
+/// Get a copy of the currently active pagetable from the cr3 register
+pub fn copy_active_pagetable() -> PageTable {
+    let (page_table, _) = Cr3::read();
+    let frame = page_table.into();
+
+    unsafe { PageTable::load_table(frame).clone() } // This is safe as the physical address has been loaded directly from cr3
+}

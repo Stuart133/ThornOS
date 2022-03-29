@@ -90,7 +90,7 @@ impl BootInfoAllocator {
     /// Create a new frame allocator
     ///
     /// This is unsafe because the caller must guarantee that the passed
-    /// memory map is valid. All froms marked as USABLE must actually be unused
+    /// memory map is valid. All frames marked as USABLE must actually be unused
     unsafe fn init(memory_map: &'static MemoryMap) -> Self {
         BootInfoAllocator {
             memory_map,

@@ -1,7 +1,7 @@
 use lazy_static::lazy_static;
 use spin::Mutex;
 
-use crate::{pagetable::PageTable, println};
+use crate::{pagetable::PageTable, println, memory};
 
 const NPROC: usize = 2;
 
@@ -24,7 +24,7 @@ impl Process {
             state: State::Available,
             exit_code: 0,
             process_id: 0,
-            pagetable: PageTable::new(),
+            pagetable: memory::copy_active_pagetable(),
         }
     }
 }

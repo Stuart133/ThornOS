@@ -13,7 +13,7 @@ const PAGE_TABLE_SIZE: usize = 512;
 
 #[repr(align(4096))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PageTable {
     entries: [PageTableEntry; PAGE_TABLE_SIZE],
 }
@@ -30,7 +30,7 @@ impl PageTable {
     /// This is unsafe because it transmutes the start address of the frame into a page table
     /// If it doesn't actually point to a page table memory corruption could occur
     #[inline]
-    unsafe fn load_table<'a>(frame: Phys) -> &'a PageTable {
+    pub unsafe fn load_table<'a>(frame: Phys) -> &'a PageTable {
         let virt = get_offset() + frame.start_address().as_u64();
         let table_ptr: *const PageTable = virt.as_ptr();
 
@@ -93,6 +93,7 @@ impl PageTable {
 
     // TODO: Allow huge page mapping
     // TODO: Handle huge pages properly
+    // TODO: Handle page table entry flushing correctly
     #[inline]
     fn map_page_inner<T: FrameAllocator>(
         &mut self,
