@@ -28,7 +28,7 @@ pub fn init(boot_info: &'static BootInfo) {
     interrupts::init_pics();
     unsafe { allocator::init(&boot_info.memory_map) }; // We're getting the memory map from the boot info so this is safe
     unsafe { memory::init(boot_info.physical_memory_offset) }; // We're getting the offset from the boot info so this is safe
-    process::init_process();
+    process::init_process_list();
     x86_64::instructions::interrupts::enable();
 }
 

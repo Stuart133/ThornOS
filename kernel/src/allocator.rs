@@ -72,6 +72,7 @@ impl FrameAllocator for ZeroAllocator {
 }
 
 // TODO: Check out named existential types to store iterator and avoid recreating for every alloc
+// TODO: Add some tests
 pub struct BootInfoAllocator {
     memory_map: &'static MemoryMap,
     next: usize,
