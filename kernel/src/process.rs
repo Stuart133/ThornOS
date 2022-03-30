@@ -1,7 +1,7 @@
 use lazy_static::lazy_static;
 use spin::Mutex;
 
-use crate::{pagetable::PageTable, println, memory};
+use crate::{pagetable::PageTable, println};
 
 const NPROC: usize = 2;
 
@@ -57,10 +57,10 @@ pub fn allocate_process() {
 
                 p.state = State::Ready;
                 p.process_id = *next_pid;
-                p.pagetable = memory::copy_active_pagetable();  // TODO: Use a clean pagetable from just post init here
+                p.pagetable = PageTable::new();
 
                 *next_pid += 1;
-            },
+            }
             _ => continue,
         }
     }
