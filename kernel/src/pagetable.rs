@@ -6,6 +6,7 @@ use crate::{
     allocator::FrameAllocator,
     memory::get_offset,
     paging::{Page, PageTableEntry, PageTableEntryFlags, PageTableIndex, Phys},
+    println,
     virt_addr::VirtAddr,
 };
 
@@ -112,6 +113,7 @@ impl PageTable {
             match table[index].frame(level) {
                 Some(f) => match f {
                     Phys::Size2Mb(_) | Phys::Size1Gb(_) => {
+                        println!("HUGE?");
                         // Set the table entry here so we can index the correct virtual address PTE level
                         if table[addr.page_table_index(level)]
                             .flags()
@@ -204,9 +206,8 @@ mod tests {
     };
 
     use crate::{
-        allocator::{ZeroAllocator, FRAME_ALLOCATOR},
+        allocator::FRAME_ALLOCATOR,
         paging::{Page, PageTableEntry, PageTableEntryFlags},
-        vga_buffer::VGA_BUFFER_ADDRESS,
         virt_addr::VirtAddr,
     };
 
@@ -254,18 +255,27 @@ mod tests {
     #[test_case]
     fn try_to_remap() {
         let mut table = PageTable::new();
-        let addrs = [VirtAddr::new(VGA_BUFFER_ADDRESS)];
-        for addr in addrs {
-            let page = Page::containing_address(addr);
-            let frame = PhysFrame::<Size4KiB>::from_start_address(PhysAddr::new(0)).unwrap();
-            let entry = PageTableEntry::new(frame, PageTableEntryFlags::PRESENT);
+        let addr = VirtAddr::new(0xABCD);
+        let alloc = match FRAME_ALLOCATOR.wait() {
+            Some(a) => a,
+            None => panic!("boot info allocator not initialized"),
+        };
 
-            let result = unsafe { table.map_page(page, entry, &mut ZeroAllocator {}) };
-            match result {
-                Ok(_) => panic!("page should not be remapped"),
-                Err(PageMapError::PageAlreadyMapped) => {}
-                Err(err) => panic!("error mapping page: {:?}", err),
-            }
+        let page = Page::containing_address(addr);
+        let frame = PhysFrame::<Size4KiB>::from_start_address(PhysAddr::new(0)).unwrap();
+        let entry = PageTableEntry::new(frame, PageTableEntryFlags::PRESENT);
+
+        let result = unsafe { table.map_page(page, entry, &mut *alloc.lock()) };
+        match result {
+            Ok(_) => {}
+            Err(err) => panic!("error mapping page: {:?}", err),
+        }
+
+        let result = unsafe { table.map_page(page, entry, &mut *alloc.lock()) };
+        match result {
+            Ok(_) => panic!("page should not be remapped"),
+            Err(PageMapError::PageAlreadyMapped) => {}
+            Err(err) => panic!("error mapping page: {:?}", err),
         }
     }
 }

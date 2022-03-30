@@ -54,6 +54,12 @@ impl Add<u64> for VirtAddr {
     }
 }
 
+impl<T> From<*const T> for VirtAddr {
+    fn from(ptr: *const T) -> Self {
+        VirtAddr::new(ptr as u64)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::VirtAddr;
